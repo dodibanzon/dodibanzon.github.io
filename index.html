@@ -558,6 +558,7 @@
     <ul class="nav-links" id="nav-links" role="list">
       <li><a href="#" data-page="home">Home</a></li>
       <li><a href="#" data-page="experience">Experience</a></li>
+      <li><a href="#" data-page="projects">Projects</a></li>
       <li><a href="#" data-page="about">About</a></li>
       <li><a href="#" data-page="contact">Contact</a></li>
     </ul>
@@ -598,6 +599,7 @@
     </div>
     <div class="stats-row">
       <div class="stat-item"><div class="stat-num">3</div><div class="stat-label">Roles</div></div>
+      <div class="stat-item"><div class="stat-num">5</div><div class="stat-label">Projects</div></div>
       <div class="stat-item"><div class="stat-num">2023</div><div class="stat-label">Physics grad</div></div>
       <div class="stat-item"><div class="stat-num">1+</div><div class="stat-label">Years exp.</div></div>
     </div>
@@ -607,7 +609,7 @@
     <div class="bento-tile">
       <p class="bento-label"><span class="live-dot"></span>Currently</p>
       <h3 class="bento-title">Project Technical Assistant</h3>
-      <p class="bento-text">Philippine Institute for Development Studies — analyzing and visualizing health financing data, researching the efficacy of eSOA in DRG implementation.</p>
+      <p class="bento-text">Philippine Institute for Development Studies — analyzing and visualizing health financing data to support policy research.</p>
       <p class="bento-meta">Jun 2025 – Present · Philippines (UTC+8)</p>
     </div>
     <div class="bento-tile">
@@ -637,7 +639,7 @@
     <article class="proj-card">
       <div class="proj-icon">📊</div>
       <div class="proj-name">Project Technical Assistant</div>
-      <p class="proj-desc">Philippine Institute for Development Studies. Cleaned and processed datasets for the HEFP dashboard; researched the efficacy of eSOA in DRG implementation; analyzed and visualized health financing data using Stata and Python.</p>
+      <p class="proj-desc">Philippine Institute for Development Studies. Research support on health financing — preparing data for analysis, running statistical work in Stata and Python, and turning the results into visualizations for policy audiences.</p>
       <div class="proj-tags">
         <span class="tag">Python</span>
         <span class="tag">Stata</span>
@@ -653,7 +655,7 @@
     <article class="proj-card">
       <div class="proj-icon">🔬</div>
       <div class="proj-name">Consultant</div>
-      <p class="proj-desc">Epimetrics Inc. Cleaned cancer datasets for the Health Inequity project; authored technical reports on the cleaned data; designed and delivered a Python training and familiarization program for staff.</p>
+      <p class="proj-desc">Epimetrics Inc. Data consulting for public health research — producing analysis-ready datasets, documenting method and data caveats in technical reports, and raising the team's Python capability.</p>
       <div class="proj-tags">
         <span class="tag">Python</span>
         <span class="tag cyan">Data Cleaning</span>
@@ -668,14 +670,102 @@
     <article class="proj-card">
       <div class="proj-icon">⚡</div>
       <div class="proj-name">Junior Data Analyst</div>
-      <p class="proj-desc">Gridware. Built Python tools to interpret Grafana electrical grid readings into concise quantitative data, cutting average alert response time from 1 hour to under 30 minutes. Collaborated with a worldwide team ensuring 24/7 coverage.</p>
+      <p class="proj-desc">Gridware. Monitoring and analysis for electrical grid infrastructure — reading Grafana telemetry, triaging alerts, and collaborating with a worldwide team to keep 24/7 coverage.</p>
+      <div class="proj-tags">
+        <span class="tag">Python</span>
+        <span class="tag cyan">Grafana</span>
+        <span class="tag">Monitoring</span>
+      </div>
+      <div class="proj-footer">
+        <span>Apr 2024 – Jun 2024</span>
+        <a class="proj-link" href="https://gridware.com.au" target="_blank" rel="noopener">Gridware ›</a>
+      </div>
+    </article>
+  </div>
+</div>
+</template>
+
+<template id="tpl-projects">
+<div class="shell">
+  <header class="projects-header">
+    <p class="section-label">Work</p>
+    <h1>Projects.</h1>
+    <p>Datasets cleaned, tools built, and research written up — the concrete pieces behind the roles.</p>
+  </header>
+
+  <div class="proj-grid">
+    <article class="proj-card">
+      <div class="proj-icon">📈</div>
+      <div class="proj-name">HEFP dashboard dataset</div>
+      <p class="proj-desc">Cleaned and processed the source datasets behind the HEFP dashboard, standardizing them into a consistent, analysis-ready form for the published views.</p>
+      <div class="proj-tags">
+        <span class="tag">Python</span>
+        <span class="tag">Stata</span>
+        <span class="tag cyan">Data Cleaning</span>
+        <span class="tag green">Ongoing</span>
+      </div>
+      <div class="proj-footer">
+        <span>PIDS · 2025</span>
+        <a class="proj-link" href="https://www.pids.gov.ph" target="_blank" rel="noopener">PIDS ›</a>
+      </div>
+    </article>
+
+    <article class="proj-card">
+      <div class="proj-icon">🏥</div>
+      <div class="proj-name">eSOA in DRG implementation</div>
+      <p class="proj-desc">Research into the efficacy of the eSOA in DRG implementation, reviewing the available data and evidence to inform health financing policy.</p>
+      <div class="proj-tags">
+        <span class="tag">Stata</span>
+        <span class="tag cyan">Health Financing</span>
+        <span class="tag">Policy Research</span>
+        <span class="tag green">Ongoing</span>
+      </div>
+      <div class="proj-footer">
+        <span>PIDS · 2025</span>
+        <a class="proj-link" href="https://www.pids.gov.ph" target="_blank" rel="noopener">PIDS ›</a>
+      </div>
+    </article>
+
+    <article class="proj-card">
+      <div class="proj-icon">🧬</div>
+      <div class="proj-name">Health Inequity datasets</div>
+      <p class="proj-desc">Cleaned the cancer datasets for the Health Inequity project and authored the technical reports documenting the cleaning process and the caveats in the resulting data.</p>
+      <div class="proj-tags">
+        <span class="tag">Python</span>
+        <span class="tag cyan">Data Cleaning</span>
+        <span class="tag">Research Writing</span>
+      </div>
+      <div class="proj-footer">
+        <span>Epimetrics · 2025</span>
+        <a class="proj-link" href="https://epimetrics.com.ph" target="_blank" rel="noopener">Epimetrics ›</a>
+      </div>
+    </article>
+
+    <article class="proj-card">
+      <div class="proj-icon">🐍</div>
+      <div class="proj-name">Python training program</div>
+      <p class="proj-desc">Designed and delivered a Python training and familiarization program for staff, covering the fundamentals needed for day-to-day data work.</p>
+      <div class="proj-tags">
+        <span class="tag">Python</span>
+        <span class="tag cyan">Training</span>
+      </div>
+      <div class="proj-footer">
+        <span>Epimetrics · 2025</span>
+        <a class="proj-link" href="https://epimetrics.com.ph" target="_blank" rel="noopener">Epimetrics ›</a>
+      </div>
+    </article>
+
+    <article class="proj-card">
+      <div class="proj-icon">🔌</div>
+      <div class="proj-name">Grid alert triage tooling</div>
+      <p class="proj-desc">Python tools that interpret Grafana electrical grid readings into concise quantitative data, cutting average alert response time from 1 hour to under 30 minutes.</p>
       <div class="proj-tags">
         <span class="tag">Python</span>
         <span class="tag cyan">Grafana</span>
         <span class="tag green">−50% response time</span>
       </div>
       <div class="proj-footer">
-        <span>Apr 2024 – Jun 2024</span>
+        <span>Gridware · 2024</span>
         <a class="proj-link" href="https://gridware.com.au" target="_blank" rel="noopener">Gridware ›</a>
       </div>
     </article>
@@ -725,7 +815,7 @@
         <div class="about-card-header">Now</div>
         <div class="about-card-body now-list">
           <div>📖 Reading <span>The Elements of Statistical Learning</span></div>
-          <div>🏗️ Building <span>HEFP dashboard dataset</span></div>
+          <div>🏗️ Building <span>reproducible data workflows</span></div>
           <div>🎓 Studying <span>health econometrics</span></div>
           <div>🌏 Based in <span>Philippines (UTC+8)</span></div>
         </div>
@@ -790,7 +880,7 @@
 <!-- ██ SCRIPT ██ -->
 <script>
   // ── Router ──────────────────────────────────────
-  const PAGES = ['home', 'experience', 'about', 'contact'];
+  const PAGES = ['home', 'experience', 'projects', 'about', 'contact'];
   let current = 'home';
 
   function getPage() {
