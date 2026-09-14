@@ -2,12 +2,12 @@
 
 ## Repository Overview
 
-**moadotexe.github.io** is a personal developer portfolio site deployed via GitHub Pages. It is a **zero-dependency, single-file static site** — the entire application lives in `index.html`. The design is Apple-inspired: true-black background, frosted-glass nav, gradient accent text, pill buttons, and generous whitespace.
+**dodibanzon.github.io** is Dodi Banzon's personal developer portfolio site deployed via GitHub Pages. It is a **zero-dependency, single-file static site** — the entire application lives in `index.html`. The design is Apple-inspired: true-black background, frosted-glass nav, gradient accent text, pill buttons, and generous whitespace.
 
 ## File Structure
 
 ```
-moadotexe.github.io/
+dodibanzon.github.io/
 ├── index.html     # Entire application (HTML + CSS + JS)
 ├── README.md      # Minimal readme
 └── CLAUDE.md      # This file
@@ -92,6 +92,7 @@ Defined in `:root`, used throughout — never hardcode colors:
 - Tags/badges use `.tag` — pill chips (`border-radius: 980px`), `rgba(255,255,255,.07)` fill; `.green` / `.cyan` tinted variants
 - Buttons: `.btn` base (pill, `border-radius: 980px`) + `.btn-primary` (solid `--accent-btn` blue, white text) or `.btn-ghost` (translucent white fill)
 - Home highlights use the `.bento` grid (`.bento-tile`, `.bento-label`, `.bento-title`, `.bento-text`, `.bento-meta`)
+- The Substack callout below the bento uses `.writing` / `.writing-card` (same card recipe, icon + copy + CTA; stacks below 700px)
 - Utility spacing: `.pt` / `.pb` (section padding), `.spacer-sm` / `.spacer-lg` (vertical gaps — use instead of inline styles)
 
 ### Visual Effects
@@ -167,6 +168,7 @@ The form submission handler (`handleFormSubmit`) is a **stub** — it only updat
 | `.text-grad` | Gradient-filled text utility |
 | `.hero`, `.hero-glow`, `.hero-eyebrow`, `.hero-desc` | Home hero |
 | `.bento`, `.bento-tile` | Home highlights grid |
+| `.writing`, `.writing-card` | Substack callout on the home page |
 | `.live-dot` | Pulsing green status dot |
 | `.proj-card` | Experience card component |
 | `.tag` | Skill/tech badge (pill chip) |
