@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#000000" />
-  <title>moa.exe</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%232997ff'/><stop offset='1' stop-color='%23bf5af2'/></linearGradient></defs><rect width='100' height='100' rx='23' fill='url(%23g)'/><text x='50' y='70' font-size='56' font-weight='700' font-family='Helvetica,Arial,sans-serif' fill='white' text-anchor='middle'>m</text></svg>" />
-  <meta name="description" content="Moa — data scientist in training. Applied Physics background. Health financing data analysis and policy research." />
+  <title>Dodi Banzon</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%232997ff'/><stop offset='1' stop-color='%23bf5af2'/></linearGradient></defs><rect width='100' height='100' rx='23' fill='url(%23g)'/><text x='50' y='70' font-size='56' font-weight='700' font-family='Helvetica,Arial,sans-serif' fill='white' text-anchor='middle'>D</text></svg>" />
+  <meta name="description" content="Dodi Banzon — data scientist in training. Applied Physics background. Health financing data analysis and policy research." />
 
   <style>
     /* ── Tokens ── */
@@ -302,6 +302,42 @@
       100% { box-shadow: 0 0 0 0 rgba(48,209,88,0); }
     }
 
+    /* writing / substack */
+    .writing { margin-top: 1.125rem; }
+    .writing-card {
+      background: linear-gradient(180deg, var(--surface), var(--surface2));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 24px;
+      padding: 1.875rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+      transition: border-color .3s var(--ease), transform .3s var(--ease), box-shadow .3s var(--ease);
+    }
+    .writing-card:hover {
+      border-color: rgba(255,255,255,.18);
+      transform: translateY(-3px);
+      box-shadow: 0 18px 36px rgba(0,0,0,.45);
+    }
+    .writing-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 13px;
+      background: linear-gradient(135deg, rgba(41,151,255,.18), rgba(191,90,242,.18));
+      border: 1px solid rgba(255,255,255,.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .writing-body { display: flex; flex-direction: column; gap: .65rem; }
+    .writing-title { font-size: 1.375rem; font-weight: 600; letter-spacing: -.018em; }
+    .writing-text { color: var(--text2); font-size: .9375rem; line-height: 1.55; max-width: 56ch; }
+    .writing-body .btn-row { margin-top: .35rem; }
+    @media (max-width: 700px) { .writing-card { flex-direction: column; } }
+
     /* ── EXPERIENCE ── */
     .projects-header { padding: 5rem 0 2.5rem; }
     .projects-header h1 {
@@ -553,7 +589,7 @@
 <!-- ██ NAV ██ -->
 <nav class="nav">
   <div class="shell nav-inner">
-    <div class="brand" data-page="home">moa<span class="brand-dim">.exe</span></div>
+    <div class="brand" data-page="home">Dodi<span class="brand-dim"> Banzon</span></div>
     <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">☰</button>
     <ul class="nav-links" id="nav-links" role="list">
       <li><a href="#" data-page="home">Home</a></li>
@@ -570,9 +606,10 @@
 
 <!-- ██ FOOTER ██ -->
 <footer class="footer shell">
-  <span>© <span id="year"></span> · moa.exe</span>
+  <span>© <span id="year"></span> · Dodi Banzon</span>
   <div class="footer-right">
-    <a href="https://github.com/moadotexe" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://substack.com/@dodibanzon" target="_blank" rel="noopener">Substack</a>
+    <a href="https://github.com/dodibanzon" target="_blank" rel="noopener">GitHub</a>
     <a href="#" data-page="contact">Contact</a>
     <a href="#" data-page="about">About</a>
   </div>
@@ -584,7 +621,7 @@
 <div class="shell">
   <section class="hero">
     <div class="hero-glow"></div>
-    <p class="hero-eyebrow">Hi, I'm Moa.</p>
+    <p class="hero-eyebrow">Hi, I'm Dodi Banzon.</p>
     <h1>
       Data scientist in&nbsp;training.<br>
       <span class="text-grad">Applied Physics background.</span>
@@ -623,6 +660,21 @@
       </div>
     </div>
   </section>
+
+  <section class="writing">
+    <div class="writing-card">
+      <span class="writing-icon">✍️</span>
+      <div class="writing-body">
+        <p class="bento-label">Writing</p>
+        <h3 class="writing-title">Notes on Substack.</h3>
+        <p class="writing-text">Longer-form writing that doesn't fit in a chart — notes on data work, health policy, and what I'm learning along the way.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="https://substack.com/@dodibanzon" target="_blank" rel="noopener">Read on Substack</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="spacer-lg"></div>
 </div>
 </template>
@@ -780,7 +832,7 @@
       <p class="section-label">About</p>
       <p>I'm a <strong>data scientist in training</strong> with a background in <strong>Applied Physics (Computational)</strong>. I conduct data analysis on health financing data to support policy research and decision-making.</p>
       <p>Most of my work lives in the Python + Stata stack — Python for data processing and tooling, Stata for statistical analysis. I care about reproducible workflows, clear technical documentation, and making complex data understandable to non-technical audiences.</p>
-      <p>Outside of work, I'm expanding into machine learning and health econometrics. I share notes and code on <a href="https://github.com/moadotexe">GitHub</a>. Bilingual in English and Tagalog.</p>
+      <p>Outside of work, I'm expanding into machine learning and health econometrics. I share notes and code on <a href="https://github.com/dodibanzon" target="_blank" rel="noopener">GitHub</a>, and write longer pieces on <a href="https://substack.com/@dodibanzon" target="_blank" rel="noopener">Substack</a>. Bilingual in English and Tagalog.</p>
 
       <hr class="divider">
       <p class="section-label">Stack</p>
@@ -802,7 +854,7 @@
       <div class="about-card">
         <div class="about-card-header">Profile</div>
         <div class="about-card-body">
-          <div class="info-row"><span class="info-key">Name</span><span class="info-val">Moa</span></div>
+          <div class="info-row"><span class="info-key">Name</span><span class="info-val">Dodi Banzon</span></div>
           <div class="info-row"><span class="info-key">Role</span><span class="info-val">Data scientist</span></div>
           <div class="info-row"><span class="info-key">Focus</span><span class="info-val">Health financing</span></div>
           <div class="info-row"><span class="info-key">Degree</span><span class="info-val">Applied Physics</span></div>
@@ -833,11 +885,11 @@
     <p>Open to research roles, data analysis projects, or conversations about health policy and data science.</p>
 
     <div class="contact-grid">
-      <a class="contact-card" href="https://github.com/moadotexe" target="_blank" rel="noopener">
+      <a class="contact-card" href="https://github.com/dodibanzon" target="_blank" rel="noopener">
         <span class="contact-icon">🐙</span>
         <div>
           <div class="contact-info-name">GitHub</div>
-          <div class="contact-info-val">@moadotexe</div>
+          <div class="contact-info-val">@dodibanzon</div>
         </div>
       </a>
       <a class="contact-card" href="mailto:dodibanzon@gmail.com">
@@ -845,6 +897,13 @@
         <div>
           <div class="contact-info-name">Email</div>
           <div class="contact-info-val">dodibanzon@gmail.com</div>
+        </div>
+      </a>
+      <a class="contact-card" href="https://substack.com/@dodibanzon" target="_blank" rel="noopener">
+        <span class="contact-icon">📬</span>
+        <div>
+          <div class="contact-info-name">Substack</div>
+          <div class="contact-info-val">@dodibanzon</div>
         </div>
       </a>
       <a class="contact-card" href="https://www.linkedin.com/in/dodi-banzon/" target="_blank" rel="noopener">
