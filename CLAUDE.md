@@ -163,7 +163,7 @@ The form submission handler (`handleFormSubmit`) is a **stub** — it only updat
 | `tpl-home/experience/about/contact` | Page template elements |
 | `.shell` | Max-width centered container (980px) |
 | `.nav`, `.nav-inner` | Sticky frosted-glass top navigation |
-| `.brand` | Logo/name in nav (`.brand-dim` mutes the ".exe") |
+| `.brand` | Logo/name in nav (`.brand-dim` mutes the surname) |
 | `.section-label` | Gradient eyebrow above section headings |
 | `.text-grad` | Gradient-filled text utility |
 | `.hero`, `.hero-glow`, `.hero-eyebrow`, `.hero-desc` | Home hero |
