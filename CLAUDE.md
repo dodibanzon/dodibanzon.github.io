@@ -25,21 +25,22 @@ There is no build step, no package manager, and no tooling configuration.
 |---------|-------------|
 | HTML head | Meta tags, theme-color, favicon (inline SVG, gradient rounded square), description |
 | `<style>` | All CSS: design tokens, reset, components, responsive |
-| `<body>` | Nav, `#page` mount point, footer, 4 `<template>` elements |
+| `<body>` | Nav, `#page` mount point, footer, 5 `<template>` elements |
 | `<script>` | Client-side router and form handler |
 
 ### Client-side Routing
 
-Four pages are defined as `<template id="tpl-{page}">` elements and swapped into `<div id="page">` on navigation:
+Five pages are defined as `<template id="tpl-{page}">` elements and swapped into `<div id="page">` on navigation:
 
 ```
 #home        → tpl-home
 #experience  → tpl-experience
+#projects    → tpl-projects
 #about       → tpl-about
 #contact     → tpl-contact
 ```
 
-The router (`navigate()`) performs a 180ms fade-out, clones the template into `#page`, then re-binds `[data-page]` click handlers. History is managed via `history.pushState` and `popstate`.
+The router (`navigate()`) performs a 180ms fade-out and clones the template into `#page`; a newer navigation during the fade cancels the pending one. Clicks on any `[data-page]` element are handled by a single delegated `click` listener on `document` — never bind per-element listeners on navigation (they stack and duplicate history entries). Links carry real hashes (`href="#about"`) so new-tab clicks work. History is managed via `history.pushState` and `popstate`.
 
 ## Design System
 
@@ -150,7 +151,7 @@ Pushing to `main` deploys automatically via GitHub Pages. No CI/CD pipeline exis
 
 ### Contact Form
 
-The form submission handler (`handleFormSubmit`) is a **stub** — it only updates the button state visually. To wire it up, replace the stub with a fetch call to a backend service (Formspree, Web3Forms, etc.). Do not implement a real backend without being asked.
+There is no backend. `handleFormSubmit` builds a `mailto:` link (subject + body pre-filled from the fields) and opens the visitor's email app. To switch to a hosted form service (Formspree, Web3Forms, etc.), replace it with a fetch call. Do not implement a real backend without being asked.
 
 ## Key Identifiers
 
@@ -160,7 +161,7 @@ The form submission handler (`handleFormSubmit`) is a **stub** — it only updat
 | `#nav-toggle` | Mobile hamburger button |
 | `#nav-links` | Nav link list (toggled `.open` on mobile) |
 | `#year` | Injected with `new Date().getFullYear()` on init |
-| `tpl-home/experience/about/contact` | Page template elements |
+| `tpl-home/experience/projects/about/contact` | Page template elements |
 | `.shell` | Max-width centered container (980px) |
 | `.nav`, `.nav-inner` | Sticky frosted-glass top navigation |
 | `.brand` | Logo/name in nav (`.brand-dim` mutes the surname) |
