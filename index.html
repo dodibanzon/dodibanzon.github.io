@@ -589,14 +589,14 @@
 <!-- ██ NAV ██ -->
 <nav class="nav">
   <div class="shell nav-inner">
-    <div class="brand" data-page="home">Dodi<span class="brand-dim"> Banzon</span></div>
-    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">☰</button>
+    <a class="brand" href="#home" data-page="home">Dodi<span class="brand-dim"> Banzon</span></a>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">☰</button>
     <ul class="nav-links" id="nav-links" role="list">
-      <li><a href="#" data-page="home">Home</a></li>
-      <li><a href="#" data-page="experience">Experience</a></li>
-      <li><a href="#" data-page="projects">Projects</a></li>
-      <li><a href="#" data-page="about">About</a></li>
-      <li><a href="#" data-page="contact">Contact</a></li>
+      <li><a href="#home" data-page="home">Home</a></li>
+      <li><a href="#experience" data-page="experience">Experience</a></li>
+      <li><a href="#projects" data-page="projects">Projects</a></li>
+      <li><a href="#about" data-page="about">About</a></li>
+      <li><a href="#contact" data-page="contact">Contact</a></li>
     </ul>
   </div>
 </nav>
@@ -610,8 +610,8 @@
   <div class="footer-right">
     <a href="https://substack.com/@dodibanzon" target="_blank" rel="noopener">Substack</a>
     <a href="https://github.com/dodibanzon" target="_blank" rel="noopener">GitHub</a>
-    <a href="#" data-page="contact">Contact</a>
-    <a href="#" data-page="about">About</a>
+    <a href="#contact" data-page="contact">Contact</a>
+    <a href="#about" data-page="about">About</a>
   </div>
 </footer>
 
@@ -631,8 +631,8 @@
       Currently working in Python + Stata on public health research. Based in the Philippines.
     </p>
     <div class="btn-row">
-      <a class="btn btn-primary" href="#" data-page="experience">View Experience</a>
-      <a class="btn btn-ghost" href="#" data-page="contact">Get in touch</a>
+      <a class="btn btn-primary" href="#experience" data-page="experience">View Experience</a>
+      <a class="btn btn-ghost" href="#contact" data-page="contact">Get in touch</a>
     </div>
     <div class="stats-row">
       <div class="stat-item"><div class="stat-num">3</div><div class="stat-label">Roles</div></div>
@@ -930,7 +930,7 @@
         <textarea id="msg-body" placeholder="What's on your mind?"></textarea>
       </div>
       <button class="btn btn-primary" onclick="handleFormSubmit(event)">Send</button>
-      <p class="form-note">This form is wired to your preferred back-end. For quick setup try <a href="https://formspree.io" target="_blank">Formspree</a> or <a href="https://web3forms.com" target="_blank">Web3Forms</a> — both work with static sites and are free to start.</p>
+      <p class="form-note">Send opens your email app with the message filled in. You can also write to <a href="mailto:dodibanzon@gmail.com">dodibanzon@gmail.com</a> directly.</p>
     </div>
   </div>
 </div>
@@ -941,6 +941,7 @@
   // ── Router ──────────────────────────────────────
   const PAGES = ['home', 'experience', 'projects', 'about', 'contact'];
   let current = 'home';
+  let pending = null;
 
   function getPage() {
     const hash = location.hash.replace('#', '');
@@ -948,13 +949,14 @@
   }
 
   function navigate(page, push = true) {
-    if (page === current && document.getElementById('page').children.length) return;
     const el = document.getElementById('page');
+    clearTimeout(pending);
+    if (page === current && el.children.length) { el.classList.remove('leaving'); return; }
 
     // exit animation
     el.classList.add('leaving');
 
-    setTimeout(() => {
+    pending = setTimeout(() => {
       // swap content
       const tpl = document.getElementById('tpl-' + page);
       el.innerHTML = '';
@@ -972,20 +974,17 @@
 
       // scroll to top
       window.scrollTo({ top: 0 });
-
-      // bind inner links
-      bindLinks();
     }, 180);
   }
 
-  function bindLinks() {
-    document.querySelectorAll('[data-page]').forEach(el => {
-      el.addEventListener('click', e => {
-        const p = el.dataset.page;
-        if (PAGES.includes(p)) { e.preventDefault(); navigate(p); }
-      });
-    });
-  }
+  // one delegated handler covers nav, footer, and links inside page templates
+  document.addEventListener('click', e => {
+    const link = e.target.closest('[data-page]');
+    if (!link || !PAGES.includes(link.dataset.page)) return;
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // let new-tab clicks through
+    e.preventDefault();
+    navigate(link.dataset.page);
+  });
 
   // ── Init ────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
@@ -995,24 +994,32 @@
     // nav mobile toggle
     const toggle = document.getElementById('nav-toggle');
     const links  = document.getElementById('nav-links');
-    toggle.addEventListener('click', () => links.classList.toggle('open'));
-    links.addEventListener('click', () => links.classList.remove('open'));
-
-    // nav data-page links
-    bindLinks();
+    const setOpen = open => {
+      links.classList.toggle('open', open);
+      toggle.setAttribute('aria-expanded', open);
+    };
+    toggle.addEventListener('click', () => setOpen(!links.classList.contains('open')));
+    links.addEventListener('click', () => setOpen(false));
   });
 
   window.addEventListener('popstate', e => {
     navigate(e.state?.page || getPage(), false);
   });
 
-  // ── Contact form stub ───────────────────────────
+  // ── Contact form ────────────────────────────────
+  // No backend: hand the message to the visitor's email app via mailto.
   function handleFormSubmit(e) {
     e.preventDefault();
-    const btn = e.target;
-    btn.textContent = 'Sent ✓';
-    btn.style.color = 'var(--green)';
-    btn.disabled = true;
+    const name  = document.getElementById('msg-name').value.trim();
+    const email = document.getElementById('msg-email').value.trim();
+    const bodyEl = document.getElementById('msg-body');
+    const body  = bodyEl.value.trim();
+    if (!body) { bodyEl.focus(); return; }
+
+    const subject = 'Message from ' + (name || 'your website');
+    const text = body + (name || email ? '\n\n— ' + [name, email && '<' + email + '>'].filter(Boolean).join(' ') : '');
+    location.href = 'mailto:dodibanzon@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
+    e.target.textContent = 'Opening your email app…';
   }
 </script>
 </body>
