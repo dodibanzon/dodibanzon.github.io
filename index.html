@@ -516,6 +516,163 @@
     .form-note a { color: var(--accent); }
     .form-note a:hover { text-decoration: underline; }
 
+    /* ── DASHBOARD ── */
+    .dash { position: relative; display: grid; gap: 1.125rem; }
+    .dash-card {
+      background: linear-gradient(180deg, var(--surface), var(--surface2));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 24px;
+      padding: 1.875rem;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .dash-head { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1.25rem; }
+    .dash-sub { color: var(--muted); font-size: .875rem; line-height: 1.5; }
+    .dash-split { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.125rem; }
+    .dash-stack { display: flex; flex-direction: column; gap: 1.125rem; }
+    .dash-stack > :last-child { flex: 1; }
+    .dash-note { color: var(--muted); font-size: .8125rem; margin-top: 1.5rem; }
+    .dash-note a { color: var(--accent); }
+    .dash-note a:hover { text-decoration: underline; }
+
+    .dash-hit {
+      border-radius: 10px;
+      padding: 0 .5rem;
+      margin: 0 -.5rem;
+      transition: background .2s var(--ease);
+    }
+    .dash-hit:hover { background: rgba(255,255,255,.04); }
+    .dash-hit:focus-visible, .dash-data summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    @keyframes grow { from { transform: scaleX(0); } }
+
+    /* key figures */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.125rem; }
+    .kpi {
+      background: linear-gradient(180deg, var(--surface), var(--surface2));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 20px;
+      padding: 1.375rem;
+      display: flex;
+      flex-direction: column;
+      gap: .3rem;
+    }
+    .kpi-value { display: flex; align-items: baseline; gap: .4rem; }
+    .kpi-unit { font-size: .9375rem; font-weight: 600; color: var(--muted); }
+    .kpi-sub { font-size: .8125rem; color: var(--muted); line-height: 1.4; }
+
+    /* timeline */
+    .tl-row { display: grid; grid-template-columns: 200px 1fr; gap: 1rem; align-items: center; }
+    .tl-name { display: block; font-size: .9375rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+    .tl-org { display: block; font-size: .8125rem; color: var(--muted); }
+    .tl-track { position: relative; height: 56px; }
+    .tl-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.08); }
+    .tl-bar {
+      position: absolute;
+      top: 50%;
+      height: 14px;
+      margin-top: -7px;
+      min-width: 4px;
+      background: var(--accent);
+      border-radius: 4px;
+      transform-origin: left center;
+      animation: grow .7s var(--ease) both;
+    }
+    .tl-now {
+      position: absolute;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      margin: -4px 0 0 5px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 2px var(--surface);
+    }
+    .tl-axis .tl-track { height: 1.75rem; }
+    .tl-year {
+      position: absolute;
+      top: .45rem;
+      text-align: center;
+      font-size: .75rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* toolkit bars */
+    .sk-row { display: grid; grid-template-columns: 140px 1fr 1.75rem; gap: .9rem; align-items: center; min-height: 34px; }
+    .sk-name { font-size: .875rem; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sk-track { height: 10px; border-radius: 0 4px 4px 0; background: rgba(41,151,255,.14); }
+    .sk-fill {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+      border-radius: 0 4px 4px 0;
+      transform-origin: left center;
+      animation: grow .7s var(--ease) both;
+    }
+    .sk-val { font-size: .875rem; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* in progress + clock */
+    .dash-now-item { display: flex; flex-direction: column; gap: .15rem; padding: .8rem 0; border-bottom: 1px solid var(--border); }
+    .dash-now-item:first-child { padding-top: 0; }
+    .dash-now-item:last-child { padding-bottom: 0; border-bottom: none; }
+    .dash-now-name { font-size: .9375rem; font-weight: 600; letter-spacing: -.01em; }
+    .dash-now-meta { font-size: .8125rem; color: var(--muted); }
+    .dash-clock { margin: .6rem 0 .35rem; }
+
+    /* tooltip */
+    .dash-tip {
+      position: absolute;
+      z-index: 10;
+      pointer-events: none;
+      min-width: 160px;
+      max-width: 280px;
+      padding: .7rem .85rem;
+      background: rgba(44,44,46,.92);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.5);
+      font-size: .8125rem;
+      line-height: 1.45;
+      display: flex;
+      flex-direction: column;
+      gap: .1rem;
+    }
+    .dash-tip[hidden] { display: none; }
+    .dash-tip-value { font-size: 1rem; font-weight: 600; color: var(--text); }
+    .dash-tip-title { color: var(--text2); }
+    .dash-tip-line { color: var(--muted); }
+
+    /* table view */
+    .dash-data { margin-top: auto; padding-top: 1.25rem; font-size: .8125rem; }
+    .dash-data summary { width: fit-content; color: var(--accent); cursor: pointer; list-style: none; border-radius: 6px; }
+    .dash-data summary::-webkit-details-marker { display: none; }
+    .dash-data summary::after { content: '›'; display: inline-block; margin-left: .35rem; transition: transform .2s var(--ease); }
+    .dash-data[open] summary::after { transform: rotate(90deg); }
+    .dash-table-wrap { overflow-x: auto; margin-top: .75rem; }
+    .dash-table { width: 100%; border-collapse: collapse; }
+    .dash-table th, .dash-table td { text-align: left; vertical-align: top; padding: .5rem .75rem .5rem 0; border-bottom: 1px solid var(--border); }
+    .dash-table th:last-child, .dash-table td:last-child { padding-right: 0; }
+    .dash-table th { color: var(--muted); font-weight: 500; }
+    .dash-table td { color: var(--text2); }
+    .dash-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .dash-table tr:last-child td { border-bottom: none; }
+
+    @media (max-width: 700px) {
+      .dash-split { grid-template-columns: 1fr; }
+      .dash-card { padding: 1.375rem; }
+      .tl-row { grid-template-columns: 1fr; gap: .1rem; padding-top: .5rem; }
+      .tl-track { height: 32px; }
+      .tl-axis { padding-top: 0; }
+      .tl-axis .tl-label { display: none; }
+      .sk-row { grid-template-columns: 110px 1fr 1.5rem; gap: .7rem; }
+    }
+
     /* ── Footer ── */
     .footer {
       border-top: 1px solid var(--border);
@@ -544,7 +701,7 @@
       font-size: 1.2rem;
       line-height: 1;
     }
-    @media (max-width: 520px) {
+    @media (max-width: 640px) {
       .nav-toggle { display: block; }
       .nav-links {
         display: none;
@@ -569,6 +726,8 @@
       }
       .nav-links li:last-child a { border-bottom: none; }
       .nav-links a.active { background: none; }
+    }
+    @media (max-width: 520px) {
       .btn-row { flex-direction: column; align-items: stretch; }
       .stats-row { gap: 2rem; }
     }
@@ -595,6 +754,7 @@
       <li><a href="#" data-page="home">Home</a></li>
       <li><a href="#" data-page="experience">Experience</a></li>
       <li><a href="#" data-page="projects">Projects</a></li>
+      <li><a href="#" data-page="dashboard">Dashboard</a></li>
       <li><a href="#" data-page="about">About</a></li>
       <li><a href="#" data-page="contact">Contact</a></li>
     </ul>
@@ -825,6 +985,59 @@
 </div>
 </template>
 
+<template id="tpl-dashboard">
+<div class="shell">
+  <header class="projects-header">
+    <p class="section-label">Data</p>
+    <h1>Dashboard.</h1>
+    <p>My career, charted. Every figure here is computed from the rest of this site, so it keeps itself up to date.</p>
+  </header>
+
+  <div class="dash" id="dash">
+    <section class="kpi-row" id="dash-kpis" aria-label="Key figures"></section>
+
+    <section class="dash-card">
+      <div class="dash-head">
+        <p class="bento-label">Timeline</p>
+        <h2 class="bento-title">Where I've worked.</h2>
+      </div>
+      <div id="dash-timeline"></div>
+    </section>
+
+    <div class="dash-split">
+      <section class="dash-card">
+        <div class="dash-head">
+          <p class="bento-label">Toolkit</p>
+          <h2 class="bento-title">What the work runs on.</h2>
+          <p class="dash-sub" id="dash-skills-sub"></p>
+        </div>
+        <div id="dash-skills"></div>
+      </section>
+
+      <div class="dash-stack">
+        <section class="dash-card">
+          <div class="dash-head">
+            <p class="bento-label"><span class="live-dot"></span>Live</p>
+            <h2 class="bento-title">In progress.</h2>
+          </div>
+          <div id="dash-now"></div>
+        </section>
+        <section class="dash-card">
+          <p class="bento-label">Local time</p>
+          <p class="stat-num dash-clock" id="dash-clock">–</p>
+          <p class="dash-sub" id="dash-clock-sub">Philippines · UTC+8</p>
+        </section>
+      </div>
+    </div>
+
+    <div class="dash-tip" id="dash-tip" role="tooltip" hidden></div>
+  </div>
+
+  <p class="dash-note">Source: the <a href="#" data-page="experience">Experience</a> and <a href="#" data-page="projects">Projects</a> pages, recomputed in your browser on every visit.</p>
+  <div class="spacer-lg"></div>
+</div>
+</template>
+
 <template id="tpl-about">
 <div class="shell">
   <div class="about-layout">
@@ -939,7 +1152,7 @@
 <!-- ██ SCRIPT ██ -->
 <script>
   // ── Router ──────────────────────────────────────
-  const PAGES = ['home', 'experience', 'projects', 'about', 'contact'];
+  const PAGES = ['home', 'experience', 'projects', 'dashboard', 'about', 'contact'];
   let current = 'home';
 
   function getPage() {
@@ -959,6 +1172,7 @@
       const tpl = document.getElementById('tpl-' + page);
       el.innerHTML = '';
       el.appendChild(tpl.content.cloneNode(true));
+      if (page === 'dashboard') renderDashboard();
       el.classList.remove('leaving');
       current = page;
 
@@ -973,13 +1187,13 @@
       // scroll to top
       window.scrollTo({ top: 0 });
 
-      // bind inner links
-      bindLinks();
+      // bind inner links (only the new page's — nav/footer are bound once on init)
+      bindLinks(el);
     }, 180);
   }
 
-  function bindLinks() {
-    document.querySelectorAll('[data-page]').forEach(el => {
+  function bindLinks(root = document) {
+    root.querySelectorAll('[data-page]').forEach(el => {
       el.addEventListener('click', e => {
         const p = el.dataset.page;
         if (PAGES.includes(p)) { e.preventDefault(); navigate(p); }
@@ -1005,6 +1219,266 @@
   window.addEventListener('popstate', e => {
     navigate(e.state?.page || getPage(), false);
   });
+
+  // ── Dashboard ───────────────────────────────────
+  // Every figure is derived from the Experience and Projects templates,
+  // so the dashboard stays in sync as cards are added or edited.
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // "Jun 2025" → months since year 0 (null if unparseable)
+  function monthIndex(text) {
+    const m = /^([a-z]{3})[a-z]*\.?\s+(\d{4})$/i.exec(text.trim());
+    const i = m ? MONTHS.findIndex(n => n.toLowerCase() === m[1].toLowerCase()) : -1;
+    return i < 0 ? null : Number(m[2]) * 12 + i;
+  }
+  const monthLabel = i => MONTHS[i % 12] + ' ' + Math.floor(i / 12);
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+  function make(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function readCards(tplId) {
+    return [...document.getElementById(tplId).content.querySelectorAll('.proj-card')].map(card => {
+      const text = sel => (card.querySelector(sel)?.textContent || '').trim();
+      const tags = [...card.querySelectorAll('.tag')];
+      return {
+        name:   text('.proj-name'),
+        org:    text('.proj-link').replace(/›$/, '').trim(),
+        when:   text('.proj-footer span'),
+        // green tags carry status/results ("Current", "−50% response time"), the rest are skills
+        skills: tags.filter(t => !t.classList.contains('green')).map(t => t.textContent.trim()),
+        status: tags.filter(t => t.classList.contains('green')).map(t => t.textContent.trim()),
+      };
+    });
+  }
+
+  function dashboardData() {
+    const now = new Date();
+    const nowIdx = now.getFullYear() * 12 + now.getMonth();
+    const roles = readCards('tpl-experience').map(c => {
+      const [from = '', to = ''] = c.when.split(/\s*[–—-]\s*/);
+      const current = /present/i.test(to);
+      return { ...c, kind: 'Role', current, start: monthIndex(from), end: current ? nowIdx : monthIndex(to) };
+    }).filter(r => r.start != null && r.end != null && r.end >= r.start)
+      .sort((a, b) => a.start - b.start);
+    const projects = readCards('tpl-projects').map(c => ({
+      ...c, kind: 'Project', current: c.status.some(s => /ongoing|current/i.test(s)),
+    }));
+    return { now, nowIdx, roles, projects };
+  }
+
+  // Hover/focus tooltip. Everything it shows is also in the labels or the data table.
+  function bindTip(target, info) {
+    const tip = document.getElementById('dash-tip');
+    const box = document.getElementById('dash');
+    const place = (x, y) => {
+      const r = box.getBoundingClientRect();
+      let left = x - r.left + 14;
+      let top = y - r.top + 14;
+      if (left + tip.offsetWidth > r.width) left = x - r.left - tip.offsetWidth - 14;
+      if (y + 14 + tip.offsetHeight > window.innerHeight) top = y - r.top - tip.offsetHeight - 14;
+      tip.style.left = Math.max(0, left) + 'px';
+      tip.style.top = top + 'px';
+    };
+    const show = () => {
+      tip.replaceChildren(
+        make('strong', 'dash-tip-value', info.value),
+        make('span', 'dash-tip-title', info.title),
+        ...info.lines.map(l => make('span', 'dash-tip-line', l)));
+      tip.hidden = false;
+    };
+    const hide = () => { tip.hidden = true; };
+    target.tabIndex = 0;
+    target.setAttribute('role', 'img');
+    target.setAttribute('aria-label', [info.title, info.value, ...info.lines].join('. '));
+    target.addEventListener('pointerenter', e => { show(); place(e.clientX, e.clientY); });
+    target.addEventListener('pointermove', e => place(e.clientX, e.clientY));
+    target.addEventListener('pointerleave', hide);
+    target.addEventListener('focus', () => {
+      show();
+      const b = target.getBoundingClientRect();
+      place(b.left + b.width / 2, b.bottom);
+    });
+    target.addEventListener('blur', hide);
+  }
+
+  // Collapsible table twin of a chart
+  function dataTable(cols, rows) {
+    const details = make('details', 'dash-data');
+    const table = make('table', 'dash-table');
+    const head = table.createTHead().insertRow();
+    cols.forEach(c => {
+      const th = make('th', c.num ? 'num' : null, c.label);
+      th.scope = 'col';
+      head.append(th);
+    });
+    const body = table.createTBody();
+    rows.forEach(row => {
+      const tr = body.insertRow();
+      row.forEach((v, i) => {
+        const td = tr.insertCell();
+        td.textContent = v;
+        if (cols[i].num) td.className = 'num';
+      });
+    });
+    const wrap = make('div', 'dash-table-wrap');
+    wrap.append(table);
+    details.append(make('summary', null, 'Data table'), wrap);
+    return details;
+  }
+
+  function renderKpis(d) {
+    const months = new Set();
+    d.roles.forEach(r => { for (let m = r.start; m <= r.end; m++) months.add(m); });
+    const tiles = [
+      { label: 'Experience', value: months.size, unit: months.size === 1 ? 'month' : 'months',
+        sub: d.roles.length ? 'Since ' + monthLabel(d.roles[0].start) : '' },
+      { label: 'Roles', value: d.roles.length, sub: d.roles.filter(r => r.current).length + ' current' },
+      { label: 'Projects', value: d.projects.length, sub: d.projects.filter(p => p.current).length + ' ongoing' },
+    ];
+    // result tags ("−50% response time") become their own tiles
+    [...d.roles, ...d.projects].forEach(c => c.status.forEach(s => {
+      const m = /^([−+-]?\d[\d.,]*%?)\s+(.+)$/.exec(s);
+      if (m) tiles.push({ label: m[2][0].toUpperCase() + m[2].slice(1), value: m[1], sub: c.name });
+    }));
+
+    const row = document.getElementById('dash-kpis');
+    tiles.forEach(t => {
+      const tile = make('div', 'kpi');
+      const value = make('div', 'kpi-value');
+      value.append(make('span', 'stat-num', String(t.value)));
+      if (t.unit) value.append(make('span', 'kpi-unit', t.unit));
+      tile.append(make('p', 'bento-label', t.label), value, make('p', 'kpi-sub', t.sub));
+      row.append(tile);
+    });
+  }
+
+  function renderTimeline(d) {
+    const box = document.getElementById('dash-timeline');
+    if (!d.roles.length) return;
+
+    // whole calendar years, from the first role through the current year
+    const y0 = Math.floor(d.roles[0].start / 12);
+    const y1 = Math.floor(Math.max(d.nowIdx, ...d.roles.map(r => r.end)) / 12) + 1;
+    const pct = m => (m - y0 * 12) / ((y1 - y0) * 12) * 100;
+    const daysInMonth = new Date(d.now.getFullYear(), d.now.getMonth() + 1, 0).getDate();
+    const today = d.nowIdx + (d.now.getDate() - 1) / daysInMonth;
+
+    d.roles.forEach((r, i) => {
+      const months = r.end - r.start + 1;
+      const endPos = r.current ? today : r.end + 1;
+      const row = make('div', 'tl-row dash-hit');
+      const label = make('div', 'tl-label');
+      label.append(make('span', 'tl-name', r.name), make('span', 'tl-org', r.org + ' · ' + months + ' mo'));
+      const track = make('div', 'tl-track');
+      for (let y = y0; y <= y1; y++) {
+        const tick = make('span', 'tl-tick');
+        tick.style.left = pct(y * 12) + '%';
+        track.append(tick);
+      }
+      const bar = make('span', 'tl-bar');
+      bar.style.left = pct(r.start) + '%';
+      bar.style.width = (pct(endPos) - pct(r.start)) + '%';
+      bar.style.animationDelay = i * 80 + 'ms';
+      track.append(bar);
+      if (r.current) {
+        const dot = make('span', 'tl-now');
+        dot.style.left = pct(endPos) + '%';
+        track.append(dot);
+      }
+      row.append(label, track);
+      bindTip(row, { value: plural(months, 'month'), title: r.name + ' · ' + r.org, lines: [r.when] });
+      box.append(row);
+    });
+
+    const axis = make('div', 'tl-row tl-axis');
+    const axisTrack = make('div', 'tl-track');
+    for (let y = y0; y < y1; y++) {
+      const year = make('span', 'tl-year', String(y));
+      year.style.left = pct(y * 12) + '%';
+      year.style.width = 100 / (y1 - y0) + '%';
+      axisTrack.append(year);
+    }
+    axis.append(make('div', 'tl-label'), axisTrack);
+    box.append(axis);
+
+    box.parentElement.append(dataTable(
+      [{ label: 'Role' }, { label: 'Organization' }, { label: 'Start' }, { label: 'End' }, { label: 'Months', num: true }],
+      d.roles.map(r => [r.name, r.org, monthLabel(r.start), r.current ? 'Present' : monthLabel(r.end), r.end - r.start + 1])));
+  }
+
+  function renderSkills(d) {
+    const items = [...d.roles, ...d.projects];
+    const uses = new Map();
+    items.forEach(it => new Set(it.skills).forEach(s => uses.set(s, [...(uses.get(s) || []), it])));
+    const skills = [...uses].map(([name, list]) => ({ name, list }))
+      .sort((a, b) => b.list.length - a.list.length || a.name.localeCompare(b.name));
+    const where = it => it.kind === 'Role' ? it.name + ' (' + it.org + ')' : it.name;
+
+    document.getElementById('dash-skills-sub').textContent =
+      'How many of my ' + items.length + ' roles and projects use each skill.';
+    const box = document.getElementById('dash-skills');
+    skills.forEach((s, i) => {
+      const row = make('div', 'sk-row dash-hit');
+      const track = make('div', 'sk-track');
+      const fill = make('span', 'sk-fill');
+      fill.style.width = s.list.length / items.length * 100 + '%';
+      fill.style.animationDelay = i * 40 + 'ms';
+      track.append(fill);
+      row.append(make('span', 'sk-name', s.name), track, make('span', 'sk-val', String(s.list.length)));
+      bindTip(row, { value: s.list.length + ' of ' + items.length, title: s.name, lines: s.list.map(where) });
+      box.append(row);
+    });
+
+    box.parentElement.append(dataTable(
+      [{ label: 'Skill' }, { label: 'Count', num: true }, { label: 'Used in' }],
+      skills.map(s => [s.name, s.list.length, s.list.map(where).join(', ')])));
+  }
+
+  function renderNow(d) {
+    const box = document.getElementById('dash-now');
+    const live = [...d.roles.filter(r => r.current).reverse(), ...d.projects.filter(p => p.current)];
+    if (!live.length) { box.append(make('p', 'dash-sub', 'Nothing in progress right now.')); return; }
+    live.forEach(it => {
+      const item = make('div', 'dash-now-item');
+      const meta = it.kind === 'Role' ? it.org + ' · Role since ' + monthLabel(it.start) : it.org + ' · Project';
+      item.append(make('span', 'dash-now-name', it.name), make('span', 'dash-now-meta', meta));
+      box.append(item);
+    });
+  }
+
+  function renderClock() {
+    const clock = document.getElementById('dash-clock');
+    const sub = document.getElementById('dash-clock-sub');
+    const zone = 'Asia/Manila';
+    const time = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit' });
+    const day = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'long' });
+    // Manila is UTC+8 year-round; getTimezoneOffset() is the viewer's (UTC − local) in minutes
+    const diff = (480 + new Date().getTimezoneOffset()) / 60;
+    const rel = diff === 0 ? 'same time zone as you'
+      : plural(+Math.abs(diff).toFixed(2), 'hour') + (diff > 0 ? ' ahead of you' : ' behind you');
+    const tick = () => {
+      if (!clock.isConnected) return clearInterval(timer);
+      const now = new Date();
+      clock.textContent = time.format(now);
+      sub.textContent = day.format(now) + ' in the Philippines · ' + rel;
+    };
+    const timer = setInterval(tick, 10000);
+    tick();
+  }
+
+  function renderDashboard() {
+    const d = dashboardData();
+    renderKpis(d);
+    renderTimeline(d);
+    renderSkills(d);
+    renderNow(d);
+    renderClock();
+  }
 
   // ── Contact form stub ───────────────────────────
   function handleFormSubmit(e) {
