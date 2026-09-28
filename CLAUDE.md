@@ -25,21 +25,23 @@ There is no build step, no package manager, and no tooling configuration.
 |---------|-------------|
 | HTML head | Meta tags, theme-color, favicon (inline SVG, gradient rounded square), description |
 | `<style>` | All CSS: design tokens, reset, components, responsive |
-| `<body>` | Nav, `#page` mount point, footer, 4 `<template>` elements |
-| `<script>` | Client-side router and form handler |
+| `<body>` | Nav, `#page` mount point, footer, 6 `<template>` elements |
+| `<script>` | Client-side router, dashboard renderer, form handler |
 
 ### Client-side Routing
 
-Four pages are defined as `<template id="tpl-{page}">` elements and swapped into `<div id="page">` on navigation:
+Six pages are defined as `<template id="tpl-{page}">` elements and swapped into `<div id="page">` on navigation:
 
 ```
 #home        → tpl-home
 #experience  → tpl-experience
+#projects    → tpl-projects
+#dashboard   → tpl-dashboard
 #about       → tpl-about
 #contact     → tpl-contact
 ```
 
-The router (`navigate()`) performs a 180ms fade-out, clones the template into `#page`, then re-binds `[data-page]` click handlers. History is managed via `history.pushState` and `popstate`.
+The router (`navigate()`) performs a 180ms fade-out, clones the template into `#page`, then binds `[data-page]` click handlers inside the new page only (nav/footer links are bound once on init — re-binding them would stack duplicate listeners). History is managed via `history.pushState` and `popstate`.
 
 ## Design System
 
@@ -72,7 +74,7 @@ Defined in `:root`, used throughout — never hardcode colors:
 ### Layout
 
 - `.shell` — centered container, `max-width: 980px` (Apple's classic content width), `padding: 0 1.375rem`
-- Responsive breakpoints: `520px` (mobile nav/buttons), `700px` (about layout + bento stack)
+- Responsive breakpoints: `640px` (hamburger nav), `520px` (stacked buttons), `700px` (about layout, bento, dashboard stack)
 - Use CSS Grid with `auto-fill` / `auto-fit` + `minmax()` for card grids
 
 ### Typography
@@ -93,6 +95,7 @@ Defined in `:root`, used throughout — never hardcode colors:
 - Buttons: `.btn` base (pill, `border-radius: 980px`) + `.btn-primary` (solid `--accent-btn` blue, white text) or `.btn-ghost` (translucent white fill)
 - Home highlights use the `.bento` grid (`.bento-tile`, `.bento-label`, `.bento-title`, `.bento-text`, `.bento-meta`)
 - The Substack callout below the bento uses `.writing` / `.writing-card` (same card recipe, icon + copy + CTA; stacks below 700px)
+- The Dashboard page uses `.kpi` stat tiles, `.dash-card` panels (same card recipe), a `.tl-*` role timeline, `.sk-*` skill bars, a shared `.dash-tip` tooltip and a `.dash-data` "Data table" disclosure under each chart
 - Utility spacing: `.pt` / `.pb` (section padding), `.spacer-sm` / `.spacer-lg` (vertical gaps — use instead of inline styles)
 
 ### Visual Effects
@@ -148,6 +151,16 @@ Pushing to `main` deploys automatically via GitHub Pages. No CI/CD pipeline exis
 - Do not add inline styles — use CSS classes instead (see `.spacer-sm` / `.spacer-lg`)
 - Do not re-introduce heavy decoration (noise overlays, scan lines, borders everywhere) — it breaks the minimal look
 
+### Dashboard
+
+`#dashboard` has no data of its own — `renderDashboard()` reads the `.proj-card`s in `tpl-experience` and `tpl-projects` every time the page mounts, so editing those cards updates it automatically. Keep these card conventions intact:
+
+- `.proj-footer span` on Experience cards is a date range like `Jun 2025 – Present` or `Mar 2025 – May 2025` (drives the timeline and months of experience)
+- `.proj-link` text is the short org name (`PIDS ›`)
+- Plain and `.cyan` tags are skills (counted in the Toolkit chart); `.green` tags are status (`Current`, `Ongoing` → "In progress") or a result that starts with a number (`−50% response time` → its own key-figure tile)
+
+Chart marks use `--accent` only (single series); every chart has a hover/focus tooltip and a "Data table" twin.
+
 ### Contact Form
 
 The form submission handler (`handleFormSubmit`) is a **stub** — it only updates the button state visually. To wire it up, replace the stub with a fetch call to a backend service (Formspree, Web3Forms, etc.). Do not implement a real backend without being asked.
@@ -160,7 +173,7 @@ The form submission handler (`handleFormSubmit`) is a **stub** — it only updat
 | `#nav-toggle` | Mobile hamburger button |
 | `#nav-links` | Nav link list (toggled `.open` on mobile) |
 | `#year` | Injected with `new Date().getFullYear()` on init |
-| `tpl-home/experience/about/contact` | Page template elements |
+| `tpl-home/experience/projects/dashboard/about/contact` | Page template elements |
 | `.shell` | Max-width centered container (980px) |
 | `.nav`, `.nav-inner` | Sticky frosted-glass top navigation |
 | `.brand` | Logo/name in nav (`.brand-dim` mutes the surname) |
