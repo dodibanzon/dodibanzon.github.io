@@ -163,7 +163,7 @@ Chart marks use `--accent` only (single series); every chart has a hover/focus t
 
 ### Contact Form
 
-The form submission handler (`handleFormSubmit`) is a **stub** — it only updates the button state visually. To wire it up, replace the stub with a fetch call to a backend service (Formspree, Web3Forms, etc.). Do not implement a real backend without being asked.
+`handleFormSubmit` POSTs the form as JSON to [Web3Forms](https://web3forms.com) (`https://api.web3forms.com/submit`), which emails the message to `dodibanzon@gmail.com`. The public access key lives in the `WEB3FORMS_KEY` constant next to the handler (safe to commit). While it is still the `YOUR_ACCESS_KEY` placeholder, the form shows a "not set up" message instead of sending. Inputs need `name` attributes (`name`, `email`, `message`), and the hidden `botcheck` checkbox (`.form-hp`) is the honeypot — keep both. Status text goes in `#form-status` (`.ok` / `.err`). Do not implement a real backend without being asked.
 
 ## Key Identifiers
 
