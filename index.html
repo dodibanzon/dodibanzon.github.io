@@ -1457,7 +1457,7 @@
     const clock = document.getElementById('dash-clock');
     const sub = document.getElementById('dash-clock-sub');
     const zone = 'Asia/Manila';
-    const time = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit' });
+    const time = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     const day = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'long' });
     // Manila is UTC+8 year-round; getTimezoneOffset() is the viewer's (UTC − local) in minutes
     const diff = (480 + new Date().getTimezoneOffset()) / 60;
