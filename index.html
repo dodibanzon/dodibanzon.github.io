@@ -512,9 +512,13 @@
       box-shadow: 0 0 0 4px rgba(41,151,255,.2);
     }
     .field textarea { min-height: 120px; }
-    .form-note { font-size: .8125rem; color: var(--muted); margin-top: 1.1rem; line-height: 1.6; }
-    .form-note a { color: var(--accent); }
-    .form-note a:hover { text-decoration: underline; }
+    .form-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .form-status { font-size: .9375rem; margin-top: 1rem; line-height: 1.5; color: var(--muted); }
+    .form-status:empty { display: none; }
+    .form-status.ok { color: var(--green); }
+    .form-status.err { color: var(--red); }
+    .btn:disabled { opacity: .6; cursor: default; }
+    .btn.sent { color: var(--green); }
 
     /* ── DASHBOARD ── */
     .dash { position: relative; display: grid; gap: 1.125rem; }
@@ -1130,23 +1134,24 @@
       </a>
     </div>
 
-    <div class="form-wrap">
+    <form class="form-wrap" id="contact-form" onsubmit="handleFormSubmit(event)">
       <h2>Send a message</h2>
       <div class="field">
         <label for="msg-name">Name</label>
-        <input id="msg-name" type="text" placeholder="Your name" autocomplete="name" />
+        <input id="msg-name" name="name" type="text" placeholder="Your name" autocomplete="name" required />
       </div>
       <div class="field">
         <label for="msg-email">Email</label>
-        <input id="msg-email" type="email" placeholder="you@example.com" autocomplete="email" />
+        <input id="msg-email" name="email" type="email" placeholder="you@example.com" autocomplete="email" required />
       </div>
       <div class="field">
         <label for="msg-body">Message</label>
-        <textarea id="msg-body" placeholder="What's on your mind?"></textarea>
+        <textarea id="msg-body" name="message" placeholder="What's on your mind?" required></textarea>
       </div>
-      <button class="btn btn-primary" onclick="handleFormSubmit(event)">Send</button>
-      <p class="form-note">This form is wired to your preferred back-end. For quick setup try <a href="https://formspree.io" target="_blank">Formspree</a> or <a href="https://web3forms.com" target="_blank">Web3Forms</a> — both work with static sites and are free to start.</p>
-    </div>
+      <input class="form-hp" type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true" />
+      <button class="btn btn-primary" type="submit">Send</button>
+      <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+    </form>
   </div>
 </div>
 </template>
@@ -1482,13 +1487,48 @@
     renderClock();
   }
 
-  // ── Contact form stub ───────────────────────────
-  function handleFormSubmit(e) {
+  // ── Contact form (Web3Forms) ────────────────────
+  // Paste your public access key from web3forms.com (it is safe to expose).
+  const WEB3FORMS_KEY = 'bd748f4f-3345-4f5f-9931-08f3d8ad2ea1';
+
+  async function handleFormSubmit(e) {
     e.preventDefault();
-    const btn = e.target;
-    btn.textContent = 'Sent ✓';
-    btn.style.color = 'var(--green)';
+    const form = e.target;
+    const btn = form.querySelector('button[type="submit"]');
+    const status = form.querySelector('#form-status');
+    const setStatus = (text, cls) => { status.textContent = text; status.className = 'form-status' + (cls ? ' ' + cls : ''); };
+
+    if (WEB3FORMS_KEY === 'YOUR_ACCESS_KEY') {
+      setStatus('The contact form isn’t set up yet. Please email dodibanzon@gmail.com instead.', 'err');
+      return;
+    }
+
+    const data = Object.fromEntries(new FormData(form));
+    data.access_key = WEB3FORMS_KEY;
+    data.subject = 'New message from dodibanzon.github.io';
+    data.from_name = 'Portfolio contact form';
+    data.botcheck = form.elements.botcheck.checked;
+
     btn.disabled = true;
+    btn.textContent = 'Sending…';
+    setStatus('');
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Request failed');
+      form.reset();
+      btn.textContent = 'Sent ✓';
+      btn.classList.add('sent');
+      setStatus('Thanks — your message is on its way.', 'ok');
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Send';
+      setStatus('Something went wrong sending your message. Please try again or email dodibanzon@gmail.com.', 'err');
+    }
   }
 </script>
 </body>
