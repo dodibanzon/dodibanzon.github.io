@@ -10,6 +10,7 @@
 dodibanzon.github.io/
 ├── index.html     # Entire application (HTML + CSS + JS)
 ├── README.md      # Minimal readme
+├── WEBFLOW.md     # Site flow: sitemap, navigation map, router/dashboard/form flows (Mermaid)
 └── CLAUDE.md      # This file
 ```
 
@@ -140,6 +141,7 @@ Pushing to `main` deploys automatically via GitHub Pages. No CI/CD pipeline exis
 - **Maintain the Apple-minimal aesthetic** — restraint is the point: hairline borders, muted grays, color only as accent
 - **Keep JS vanilla** — no frameworks, no npm dependencies
 - **Add new pages** by adding a `<template id="tpl-{page}">` and registering the page name in the `PAGES` array
+- **Keep `WEBFLOW.md` in sync** when you add, remove, or relink a page, or change the router, dashboard, or form flow
 
 ### What NOT to do
 
