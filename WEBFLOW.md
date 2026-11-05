@@ -37,7 +37,7 @@ flowchart TD
 
   site --> spend["Spending tracker<br>/spending/<br>standalone, locked with a passcode"]
   spend --> s1["Filters<br>date range · categories"]
-  spend --> s2["Total · key figures"]
+  spend --> s2["Total · key figures<br>What you kept, against your pay"]
   spend --> s3["Charts<br>by month · by category · weekly summary · week by week"]
   spend --> s4["Transactions · Your data"]
 ```
@@ -297,8 +297,11 @@ flowchart LR
   parse --> cat
   cat --> store[("localStorage<br>spending:vault<br>AES-GCM encrypted")]
   edit["Change category · delete · undo"] --> store
+  pay["Take-home pay dialog<br>pay per month, and each change"] --> store
   store --> view["computeView()<br>date range + category filter"]
   sample["makeSample()<br>until the first add or import"] --> view
+  view --> inc["incomeView()<br>pay vs. your own expenses<br>first expense to today, all categories"]
+  inc --> kept["What you kept<br>earned · spent · kept, kept each month"]
   view --> sum["Total · key figures"]
   view --> mon["Spending by month"]
   view --> cats["Where it goes"]
@@ -315,7 +318,8 @@ flowchart LR
 | Category chips | All categories, or only the ones picked |
 | A column in Week by week, or ‹ › | Chooses the week shown in the Weekly summary |
 | Category menu on a transaction | Moves every expense with that description, and is remembered for future imports |
-| Delete all data (click twice) | Removes your expenses and brings back the sample data; Undo restores them |
+| Add income / Edit income | Saves your take-home pay per month, with a row for each pay change; Remove income clears it, and Undo restores it |
+| Delete all data (click twice) | Removes your expenses and pay and brings back the sample data; Undo restores them |
 | Lock (padlock in the nav) | Locks now; the passcode is needed to see anything again |
 | Change passcode | Re-encrypts everything with a new passcode, after checking the current one |
 | Forgot your passcode? → Erase and start over (click twice) | Deletes this browser's encrypted data and asks for a new passcode |

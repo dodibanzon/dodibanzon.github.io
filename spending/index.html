@@ -6,7 +6,7 @@
   <!-- Content Security Policy: script-src pins the inline script by its SHA-256 hash. After any edit to the
        script, update the hash or the page stops working (see CLAUDE.md). There is no connect-src, so the page
        can't send anything you enter over the network. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sitapMIRXt/qsCPVU1QwHQ3eKvNR2M9tO6C/9P6+Te4='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DHW2GgLX9AfOItik1BH8ROxeh8+fzsVHPS2ugvumTlk='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'" />
   <meta name="referrer" content="no-referrer" />
   <meta name="robots" content="noindex" />
   <meta name="theme-color" content="#000000" />
@@ -455,6 +455,26 @@
     .card-foot { margin-top: auto; }
     .cat-list { margin-bottom: 1.25rem; }
 
+    /* income: earned, spent, kept; kept or overspent each month (status colors, with sign and label) */
+    .inc-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.125rem; }
+    .inc-fig { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+    .inc-val { font-size: 1.75rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+    .inc-sub { font-size: .8125rem; color: var(--muted); line-height: 1.4; }
+    .inc-sub.good { color: var(--green); font-weight: 600; }
+    .inc-sub.bad { color: var(--red); font-weight: 600; }
+    .inc-note { color: var(--muted); font-size: .9375rem; line-height: 1.5; }
+    .inc-figs + .inc-note { font-size: .8125rem; margin-top: .9rem; }
+    .kept-legend:not(:empty) { margin: 1.6rem 0 .9rem; }
+    .sw.good { background: var(--green); }
+    .sw.bad { background: var(--red); }
+    .chart-svg .bar-kept { fill: var(--green); }
+    .chart-svg .bar-over { fill: var(--red); }
+    .income-rows { display: flex; flex-direction: column; gap: .75rem; }
+    .income-row { display: grid; grid-template-columns: 1fr 1fr 30px; align-items: end; gap: .75rem; }
+    .income-row .icon-btn { margin-bottom: .45rem; }
+    .income-add { align-self: flex-start; margin-top: -.25rem; }
+    .dlg-foot .income-clear { margin-right: auto; }
+
     /* transactions */
     .search {
       width: 15rem;
@@ -713,6 +733,10 @@
       .cat-amt { grid-area: amt; }
       .cat-share { grid-area: share; }
       .card-head > .search { width: 100%; }
+      .inc-figs { grid-template-columns: 1fr; gap: .9rem; }
+      .inc-val { font-size: 1.5rem; }
+      .income-row { grid-template-columns: 1fr 30px; }
+      .income-row .field:nth-child(2) { grid-column: 1; }
       .filter-row { flex-direction: column; align-items: stretch; }
       .seg button { flex: 1; padding-left: .3rem; padding-right: .3rem; }
       .dates { display: grid; grid-template-columns: 1fr auto 1fr; }
@@ -835,6 +859,21 @@
         <div class="segbar" id="total-bar"></div>
       </div>
       <div class="kpis" id="kpis"></div>
+    </section>
+
+    <section class="card" id="income-card">
+      <div class="card-head">
+        <div>
+          <p class="card-label">Income</p>
+          <h2 class="card-title">What you kept.</h2>
+          <p class="card-sub" id="income-sub"></p>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="income" id="income-edit">Add income</button>
+      </div>
+      <div id="income-body"></div>
+      <div class="legend kept-legend" id="kept-legend"></div>
+      <div class="chart" id="kept-chart"></div>
+      <div id="kept-table"></div>
     </section>
 
     <section class="card">
@@ -1021,6 +1060,25 @@
   </form>
 </dialog>
 
+<!-- ██ TAKE-HOME PAY ██ -->
+<dialog id="income-dialog" aria-labelledby="income-title">
+  <form class="dlg" id="income-form" novalidate>
+    <div class="dlg-head">
+      <h2 id="income-title">Take-home pay</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close">×</button>
+    </div>
+    <p class="dlg-sub">What reaches your account each month, after tax. It’s encrypted with your passcode and stays in this browser. If your pay changed, add a row for each change.</p>
+    <div class="income-rows" id="income-rows"></div>
+    <button class="link-btn income-add" type="button" id="income-add">+ Add a pay change</button>
+    <p class="form-status err" id="income-status" role="alert"></p>
+    <div class="dlg-foot">
+      <button class="btn btn-ghost btn-sm btn-danger income-clear" type="button" id="income-clear">Remove income</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary btn-sm" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- ██ CHANGE PASSCODE ██ -->
 <dialog id="pass-dialog" aria-labelledby="pass-title">
   <form class="dlg" id="pass-form" novalidate>
@@ -1198,6 +1256,7 @@
     only: new Set(),              // categories picked in the filter (empty = all)
     week: null,                   // Monday of the week in the weekly summary
     query: '', limit: 30,
+    income: [],                   // take-home pay: [{ from: 'YYYY-MM-DD', amt: per month }], each until the next
   };
   let V = null, storageOk = true, undoState = null;
 
@@ -1279,6 +1338,7 @@
     }
     S.mine = d.mine === true && Array.isArray(d.txs);
     S.txs = S.mine ? d.txs.map(cleanTx).filter(Boolean) : makeSample(todayDn());
+    S.income = cleanIncome(d.income);
     setCurrency(S.currency);
   }
   function loadPrefs() {
@@ -1295,7 +1355,7 @@
     if (!KEY) return Promise.resolve();
     pending = {
       key: KEY, salt: SALT,
-      json: JSON.stringify({ v: 1, mine: S.mine, currency: S.currency, rules: S.rules,
+      json: JSON.stringify({ v: 1, mine: S.mine, currency: S.currency, rules: S.rules, income: S.income,
         txs: S.mine ? S.txs.map(({ id, d, desc, amt, cat }) => ({ id, d, desc, amt, cat })) : [] }),
     };
     if (!flushing) flushing = flush();
@@ -1316,7 +1376,7 @@
     try { localStorage.setItem(PREFS, JSON.stringify({ preset: S.preset, from: S.from, to: S.to, only: [...S.only] })); } catch { /* per-browser convenience only */ }
   }
   function snapshot() {
-    undoState = { mine: S.mine, rules: Object.assign(Object.create(null), S.rules), txs: S.txs.map(t => ({ ...t })) };
+    undoState = { mine: S.mine, rules: Object.assign(Object.create(null), S.rules), txs: S.txs.map(t => ({ ...t })), income: S.income.map(p => ({ ...p })) };
   }
   function undo() {
     if (!undoState) return;
@@ -1325,6 +1385,56 @@
     S.week = null;
     save();
     refresh();
+  }
+
+  // ── Income ──────────────────────────────────────
+  // Take-home pay is a list of periods, each lasting until the next one starts. A month's pay is
+  // spread evenly over its days, so a part-month (your first, or the current one) earns part of it.
+  function cleanIncome(list) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    for (const p of list) {
+      if (!p || typeof p.from !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(p.from)) continue;
+      const amt = Number(p.amt);
+      if (amt > 0 && Number.isFinite(amt)) out.push({ from: p.from, amt: Math.round(amt * 100) / 100 });
+    }
+    out.sort((a, b) => a.from < b.from ? -1 : a.from > b.from ? 1 : 0);
+    return out.filter((p, i) => i === 0 || p.from !== out[i - 1].from);
+  }
+  function incomeBetween(a, b) {               // pay earned from day a to day b, inclusive
+    let total = 0;
+    S.income.forEach((p, i) => {
+      const lo = Math.max(a, dnOf(p.from));
+      const hi = Math.min(b, i + 1 < S.income.length ? dnOf(S.income[i + 1].from) - 1 : b);
+      if (lo > hi) return;
+      for (let ym = ymOf(lo); ym <= ymOf(hi); ym++) {
+        const ms = ymStart(ym), me = ymEnd(ym);
+        total += p.amt * (Math.min(hi, me) - Math.max(lo, ms) + 1) / (me - ms + 1);
+      }
+    });
+    return total;
+  }
+  // Pay compared with spending, only where both exist: from your first recorded expense (or the
+  // start of your pay, or of the range) to today. Never against the sample data. Spending here
+  // counts every category, whatever the category filter, because that's what pay has to cover.
+  function incomeView(v) {
+    if (!S.income.length) return null;
+    const start = dnOf(S.income[0].from);
+    const now = S.income[S.income.length - 1], before = S.income[S.income.length - 2];
+    const out = { start, now, before, sofar: incomeBetween(start, v.today), a: null };
+    if (!S.mine || !v.b) return out;
+    const a = Math.max(v.from, v.covFrom, start), z = Math.min(v.to, v.covTo, v.today);
+    if (a > z) return out;
+    const all = S.txs.filter(t => t.dn >= a && t.dn <= z);
+    const months = [];
+    for (const m of v.months) {
+      const ma = Math.max(m.start, a), mz = Math.min(m.end, z);
+      if (ma > mz) continue;
+      const earned = incomeBetween(ma, mz), spent = sum(all.filter(t => t.dn >= ma && t.dn <= mz));
+      months.push({ m, a: ma, z: mz, earned, spent, kept: earned - spent });
+    }
+    const earned = incomeBetween(a, z), spent = sum(all);
+    return { ...out, a, z, earned, spent, kept: earned - spent, months, filtered: S.only.size > 0 };
   }
 
   // ── Sample data ─────────────────────────────────
@@ -1608,7 +1718,13 @@
       svg('text', { class: 'avg-label', x: m.l + pw + 9, y: ya + 4 }, layer).textContent = 'avg ' + fmtShort(o.avg);
     }
 
-    // hover: the whole band is the hit area, and the segment under the pointer is emphasized
+    wireColumns(root, groups, cols, m.l, band, o.onPick);
+  }
+
+  // Hover, touch and keyboard for a row of columns. The whole band is the hit area, the segment
+  // under the pointer is emphasized, and the chart is one tab stop with arrow keys between columns.
+  function wireColumns(root, groups, cols, left, band, onPick) {
+    const lastI = cols.length - 1;
     let cur = -1, curCat = null;
     const setOn = (i, cat) => {
       root.classList.toggle('hovering', i >= 0);
@@ -1617,7 +1733,7 @@
       cur = i; curCat = cat;
     };
     const indexAt = e => {
-      const r = root.getBoundingClientRect(), i = Math.floor((e.clientX - r.left - m.l) / band);
+      const r = root.getBoundingClientRect(), i = Math.floor((e.clientX - r.left - left) / band);
       return i >= 0 && i < cols.length ? i : -1;
     };
     root.addEventListener('pointermove', e => {
@@ -1629,9 +1745,8 @@
       tipShow(cols[i].tip(cat), e.clientX, e.clientY);
     });
     root.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') { setOn(-1, null); tipHide(); } });
-    if (o.onPick) root.addEventListener('click', e => { const i = indexAt(e); if (i >= 0) o.onPick(i, false); });
+    if (onPick) root.addEventListener('click', e => { const i = indexAt(e); if (i >= 0) onPick(i, false); });
 
-    // keyboard: one tab stop for the chart, arrow keys move between columns
     const sel = cols.findIndex(c => c.selected);
     groups[sel >= 0 ? sel : lastI].setAttribute('tabindex', '0');
     groups.forEach((g, i) => {
@@ -1648,12 +1763,62 @@
           const j = clamp(to, 0, lastI);
           groups.forEach((x, k) => x.setAttribute('tabindex', k === j ? '0' : '-1'));
           groups[j].focus();
-        } else if ((e.key === 'Enter' || e.key === ' ') && o.onPick) {
+        } else if ((e.key === 'Enter' || e.key === ' ') && onPick) {
           e.preventDefault();
-          o.onPick(i, true);
+          onPick(i, true);
         }
       });
     });
+  }
+
+  // Kept each month: one signed column per month, up in green when you kept money, down in red
+  // when you spent more than you earned (status colors, always with a sign and a label).
+  function bottomRounded(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h);
+    return `M${x},${y}H${x + w}V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}H${x + r}A${r},${r} 0 0 1 ${x},${y + h - r}Z`;
+  }
+  const signed = v => (v < 0 ? '−' : v > 0 ? '+' : '') + fmtShort(Math.abs(v));
+  const fmtMinus = v => (v < 0 ? '−' : '') + fmt(Math.abs(v));   // a true minus sign, as in the chart
+  function keptChart(box, cols) {
+    box.replaceChildren();
+    const W = Math.max(260, Math.floor(box.clientWidth)), H = innerWidth < 640 ? 190 : 210;
+    const hi = Math.max(0, ...cols.map(c => c.value)), lo = Math.max(0, ...cols.map(c => -c.value));
+    const step = niceScale(hi + lo || 1, 4).ticks[1];   // about four steps across the whole span
+    const top = Math.ceil(hi / step - 1e-9) * step, bot = Math.ceil(lo / step - 1e-9) * step;
+    const ticks = [];
+    for (let t = -bot; t <= top + step / 2; t += step) ticks.push(t);
+    const tickText = ticks.map(t => (t < 0 ? '−' : '') + fmtShort(Math.abs(t)));
+    const hasSub = cols.some(c => c.sub);
+    const under = lo ? 18 : 0;   // room below the lowest bar for its label, so it never meets the month names
+    const m = { t: 22, r: 2, b: (hasSub ? 38 : 24) + under, l: Math.ceil(Math.max(...tickText.map(s => s.length)) * 6.4) + 12 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const Y = v => m.t + (top - v) / ((top + bot) || 1) * ph;
+    const band = pw / cols.length, bw = Math.max(3, Math.min(24, band * .6));
+    const root = svg('svg', { class: 'chart-svg', width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'group', 'aria-label': 'Kept each month' }, box);
+    ticks.forEach((t, i) => {
+      if (t !== 0) svg('line', { class: 'grid', x1: m.l, x2: m.l + pw, y1: Math.round(Y(t)) + .5, y2: Math.round(Y(t)) + .5 }, root);
+      svg('text', { class: 'tick', x: m.l - 10, y: Y(t) + 4, 'text-anchor': 'end' }, root).textContent = tickText[i];
+    });
+    const bars = svg('g', { class: 'kept-bars' }, root), caps = svg('g', { class: 'caps' }, root), xs = svg('g', { class: 'xs' }, root);
+    const capW = c => signed(c.value).length * 6.6 + 8;
+    const fitsAll = cols.every(c => capW(c) < band);
+    const y0 = Y(0);
+    const groups = cols.map((c, i) => {
+      const cx = m.l + band * i + band / 2, x = cx - bw / 2;
+      const g = svg('g', { class: 'col', tabindex: -1, role: 'img', 'aria-label': c.aria }, bars);
+      svg('rect', { class: 'ring', x: cx - band / 2 + 2, y: m.t - 4, width: Math.max(0, band - 4), height: ph + 4, rx: 6 }, g);
+      const h = Math.abs(Y(c.value) - y0);
+      if (c.value > 0 && h >= .5) svg('path', { class: 'bar-kept', d: topRounded(x, Y(c.value), bw, h, 4) }, g);
+      if (c.value < 0 && h >= .5) svg('path', { class: 'bar-over', d: bottomRounded(x, y0, bw, h, 4) }, g);
+      if (c.value && (fitsAll || i === cols.length - 1)) {
+        svg('text', { class: 'cap', x: cx, y: c.value > 0 ? Y(c.value) - 7 : Y(c.value) + 15, 'text-anchor': 'middle' }, caps).textContent = signed(c.value);
+      }
+      if (c.label) svg('text', { class: 'xl', x: cx, y: m.t + ph + under + 17, 'text-anchor': 'middle' }, xs).textContent = c.label;
+      if (c.sub) svg('text', { class: 'xl', x: cx, y: m.t + ph + under + 31, 'text-anchor': 'middle' }, xs).textContent = c.sub;
+      return g;
+    });
+    svg('line', { class: 'baseline', x1: m.l, x2: m.l + pw, y1: Math.round(y0) + .5, y2: Math.round(y0) + .5 }, root);
+    wireColumns(root, groups, cols, m.l, band, null);
   }
 
   // Collapsible table twin of a chart (keeps its open state across re-renders)
@@ -1718,7 +1883,7 @@
 
   // ── Render ──────────────────────────────────────
   let firstPaint = true;
-  function refresh() { V = computeView(); renderAll(); }
+  function refresh() { V = computeView(); V.inc = incomeView(V); renderAll(); }
   function renderAll() {
     const empty = S.mine && !S.txs.length;
     $('sample-banner').hidden = S.mine;
@@ -1728,6 +1893,7 @@
     if (empty) return;
     renderFilters(V);
     renderSummary(V);
+    renderIncome(V);
     renderMonthly(V);
     renderCategories(V);
     renderWeek(V);
@@ -1779,6 +1945,64 @@
     else tile('Biggest expense', fmt(0), 'Nothing in this range');
   }
 
+  function renderIncome(v) {
+    const inc = v.inc, body = $('income-body'), sub = $('income-sub');
+    body.replaceChildren();
+    $('kept-legend').replaceChildren();
+    $('kept-chart').replaceChildren();
+    $('kept-table').replaceChildren();
+    $('income-edit').textContent = inc ? 'Edit income' : 'Add income';
+    if (!inc) {
+      sub.textContent = 'Add your take-home pay to see how much of it you keep each month. It’s encrypted with your passcode, like your expenses.';
+      return;
+    }
+    const since = fmt(inc.now.amt) + ' a month since ' + fd('mdy', dnOf(inc.now.from)) + (inc.before ? ' (' + fmt(inc.before.amt) + ' before)' : '');
+    if (inc.a == null) {
+      sub.textContent = 'Take-home ' + since + ', ' + fmt(inc.sofar) + ' so far.';
+      body.append(make('p', 'inc-note', S.mine
+        ? 'None of your expenses in these dates fall within your pay yet, so there’s nothing to compare.'
+        : 'These are sample expenses, so there’s nothing real to compare yet. Add or import your own to see what you kept.'));
+      return;
+    }
+    sub.textContent = span(inc.a, inc.z) + ' · take-home ' + since + '.';
+    const figs = make('div', 'inc-figs');
+    const fig = (label, value, note, tone) => {
+      const f = make('div', 'inc-fig'), n = make('p', 'inc-sub' + (tone ? ' ' + tone : ''));
+      if (tone) { const arrow = make('span', 'delta-arrow', tone === 'good' ? '▲' : '▼'); arrow.setAttribute('aria-hidden', 'true'); n.append(arrow, ' '); }
+      n.append(note);
+      f.append(make('p', 'card-label', label), make('p', 'inc-val', value), n);
+      figs.append(f);
+    };
+    fig('Earned', fmt(inc.earned), inc.z - inc.a + 1 < 28 ? 'Over ' + plural(inc.z - inc.a + 1, 'day') : 'Pay spread evenly over each month');
+    fig('Spent', fmt(inc.spent), share(inc.spent, inc.earned) + ' of what you earned');
+    if (inc.kept >= 0) fig('Kept', fmt(inc.kept), share(inc.kept, inc.earned) + ' of your pay', 'good');
+    else fig('Kept', fmtMinus(inc.kept), 'Spent ' + fmt(-inc.kept) + ' more than you earned', 'bad');
+    body.append(figs);
+    if (inc.filtered) body.append(make('p', 'inc-note', 'This counts all your spending, not just the categories picked above.'));
+    if (inc.months.length < 2) return;
+
+    const over = inc.months.some(r => r.kept < 0);
+    const leg = $('kept-legend');
+    const key = (cls, text) => { const s = make('span'); s.append(make('span', 'sw ' + cls), text); leg.append(s); };
+    key('good', 'Kept');
+    if (over) key('bad', 'Spent more than earned');
+    const multiYear = yearOf(inc.months[0].a) !== yearOf(inc.months[inc.months.length - 1].z);
+    const band = ($('kept-chart').clientWidth - 64) / inc.months.length;
+    keptChart($('kept-chart'), inc.months.map((r, i) => {
+      const lines = ['Earned ' + fmt(r.earned), 'Spent ' + fmt(r.spent) + ' (' + share(r.spent, r.earned) + ')'];
+      if (r.a > r.m.start || r.z < r.m.end) lines.push((r.m.end > v.today ? 'Month in progress: ' : 'Part of the month: ') + span(r.a, r.z));
+      return {
+        value: r.kept,
+        label: band >= 30 ? fd('m', r.m.start) : fd('mn', r.m.start),
+        sub: r.m.end > v.today && r.a <= v.today ? 'so far' : multiYear && (i === 0 || r.m.ym % 12 === 0) ? String(Math.floor(r.m.ym / 12)) : '',
+        aria: fd('my', r.m.start) + ': earned ' + fmt(r.earned) + ', spent ' + fmt(r.spent) + ', ' + (r.kept >= 0 ? 'kept ' + fmt(r.kept) : 'spent ' + fmt(-r.kept) + ' more than earned'),
+        tip: () => ({ value: fmtMinus(r.kept), title: fd('my', r.m.start) + ' · ' + (r.kept >= 0 ? 'kept' : 'spent more than earned'), lines }),
+      };
+    }));
+    putTable('kept-table', [{ label: 'Month' }, { label: 'Earned', num: true }, { label: 'Spent', num: true }, { label: 'Kept', num: true }, { label: 'Share kept', num: true }],
+      inc.months.map(r => [fd('my', r.m.start), fmt(r.earned), fmt(r.spent), fmtMinus(r.kept), r.kept >= 0 ? share(r.kept, r.earned) : '–']));
+  }
+
   function renderMonthly(v) {
     const box = $('monthly-chart');
     const present = CATS.filter(c => v.byCat[c.id]);
@@ -1793,11 +2017,14 @@
     // years go under January, and under the first month if the next January isn't right beside it
     const firstJan = v.months.findIndex(x => x.ym % 12 === 0);
     const yearAt = i => multiYear && (v.months[i].ym % 12 === 0 || (i === 0 && (firstJan < 0 || firstJan * band >= 40)));
+    const pay = v.inc && v.inc.a != null && !v.inc.filtered ? new Map(v.inc.months.map(r => [r.m.ym, r])) : null;
     const cols = v.months.map((x, i) => {
       const a = Math.max(x.start, v.from, v.covFrom), z = Math.min(x.end, v.to, v.covTo);
       const now = x.start <= v.today && x.end > v.today && v.to >= v.today;   // this month, still going
       const lines = [plural(x.n, 'expense')];
       if ((a > x.start || z < x.end) && a <= z) lines.push((now ? 'Month in progress: ' : 'Partial month: ') + span(a, z));
+      const p = pay && pay.get(x.ym);
+      if (p) lines.push('Earned ' + fmt(p.earned) + (p.kept >= 0 ? ', kept ' + fmt(p.kept) : ', spent ' + fmt(-p.kept) + ' more than that'));
       return {
         label: monthLabel(x), sub: now ? 'so far' : yearAt(i) ? String(Math.floor(x.ym / 12)) : '',
         cats: x.cats, total: x.total, aria: fd('my', x.start) + ': ' + fmt(x.total) + ariaCats(x.cats),
@@ -1872,6 +2099,12 @@
       avgEl.textContent = Math.abs(diff) < v.weekAvg * .02 ? 'Right on your weekly average of ' + fmt(v.weekAvg) + '.'
         : fmt(Math.abs(diff)) + (diff > 0 ? ' above' : ' below') + ' your weekly average of ' + fmt(v.weekAvg) + '.';
     } else avgEl.textContent = '';
+    // how this week compares with what you earned over the same days
+    if (v.inc && v.inc.a != null && !v.inc.filtered) {
+      const lo = Math.max(w + ws.a, v.inc.a), hi = Math.min(w + ws.z, v.inc.z);
+      const earned = lo <= hi ? incomeBetween(lo, hi) : 0;
+      if (earned > 0) avgEl.textContent = (avgEl.textContent + ' You spent ' + share(ws.total, earned) + ' of what you earned ' + (ws.partial ? 'on those days.' : 'that week.')).trim();
+    }
 
     const cols = ws.days.map(d => ({
       label: fd('wd', d.dn), sub: String(dateOf(d.dn)), cats: d.cats, total: d.total, muted: !d.live,
@@ -1989,10 +2222,11 @@
     const n = S.txs.length;
     const never = 'This page can’t make network requests, so what you enter never leaves your device.';
     $('data-status').textContent = S.mine
-      ? (n ? plural(n, 'expense') + ', encrypted with your passcode and saved only in this browser. ' : 'Nothing saved yet. ') + never
+      ? (n ? plural(n, 'expense') + (S.income.length ? ' and your pay' : '') + ', encrypted with your passcode and saved only in this browser. ' : 'Nothing saved yet. ') + never
         + ' Export a CSV to keep a backup or to move to another browser.'
         + (storageOk ? '' : ' Your browser is blocking storage, so changes will be lost when you close this page.')
-      : 'You’re looking at sample data, and nothing is saved until you add your own. From then on it’s encrypted with your passcode and kept only in this browser. ' + never;
+      : (S.income.length ? 'Your take-home pay is saved, encrypted with your passcode; the expenses are sample data until you add your own. '
+        : 'You’re looking at sample data, and nothing is saved until you add your own. From then on it’s encrypted with your passcode and kept only in this browser. ') + never;
     $('btn-export').hidden = !S.mine || !n;
     $('btn-clear').hidden = !S.mine;
     $('currency').value = S.currency;
@@ -2084,6 +2318,65 @@
     refresh();
     const outside = t.dn < V.from || t.dn > V.to ? ' It’s outside the dates you’re viewing.' : '';
     toast('Added ' + fmtExact(t.amt) + ' to ' + CAT[cat].name + '.' + (fresh ? ' Sample data cleared.' : '') + outside, true);
+  }
+
+  // ── Take-home pay ───────────────────────────────
+  function incomeRow(p) {
+    const row = make('div', 'income-row');
+    const from = make('label', 'field'), fi = make('input', 'inc-from');
+    fi.type = 'date';
+    fi.value = p ? p.from : '';
+    from.append(make('span', null, 'Starting'), fi);
+    const amt = make('label', 'field'), ai = make('input', 'inc-amt');
+    ai.type = 'text';
+    ai.inputMode = 'decimal';
+    ai.autocomplete = 'off';
+    ai.placeholder = '0';
+    ai.value = p ? String(p.amt) : '';
+    amt.append(make('span', null, 'Take-home a month'), ai);
+    const del = make('button', 'icon-btn inc-del', '×');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Remove this pay');
+    row.append(from, amt, del);
+    return row;
+  }
+  function openIncome() {
+    const rows = $('income-rows');
+    rows.replaceChildren(...(S.income.length ? S.income : [null]).map(incomeRow));
+    $('income-status').textContent = '';
+    $('income-clear').hidden = !S.income.length;
+    $('income-dialog').showModal();
+    rows.querySelector('input').focus();
+  }
+  function submitIncome(e) {
+    e.preventDefault();
+    const fail = msg => { $('income-status').textContent = msg; };
+    const list = [];
+    for (const row of $('income-rows').children) {
+      const from = row.querySelector('.inc-from').value, raw = row.querySelector('.inc-amt').value.trim();
+      if (!from && !raw) continue;
+      const amt = Math.abs(parseAmount(raw));
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return fail('Pick the date each pay starts.');
+      if (!(amt > 0)) return fail('Enter your take-home pay as an amount, like 12,345.67.');
+      if (list.some(p => p.from === from)) return fail('Two of these start on the same day.');
+      list.push({ from, amt });
+    }
+    if (!list.length) return fail('Enter your take-home pay, or use Remove income.');
+    snapshot();
+    S.income = cleanIncome(list);
+    save();
+    $('income-dialog').close();
+    refresh();
+    const now = S.income[S.income.length - 1];
+    toast('Saved: ' + fmt(now.amt) + ' a month since ' + fd('mdy', dnOf(now.from)) + '.', true);
+  }
+  function clearIncome() {
+    snapshot();
+    S.income = [];
+    save();
+    $('income-dialog').close();
+    refresh();
+    toast('Removed your take-home pay.', true);
   }
 
   // ── Import a CSV ────────────────────────────────
@@ -2586,6 +2879,7 @@
       if (a) {
         if (a.dataset.action === 'add') openAdd();
         else if (a.dataset.action === 'import') openImport();
+        else if (a.dataset.action === 'income') openIncome();
         else if (a.dataset.action === 'sample') { S.mine = false; S.txs = makeSample(todayDn()); S.week = null; save(); refresh(); }
       }
       const c = e.target.closest('[data-close]');
@@ -2607,6 +2901,22 @@
     for (const c of CATS) addCat.append(new Option(c.icon + ' ' + c.name, c.id));
     $('add-desc').addEventListener('input', syncAutoOption);
     $('add-form').addEventListener('submit', submitAdd);
+
+    // take-home pay dialog
+    $('income-form').addEventListener('submit', submitIncome);
+    $('income-clear').addEventListener('click', clearIncome);
+    $('income-add').addEventListener('click', () => {
+      const row = incomeRow(null);
+      $('income-rows').append(row);
+      row.querySelector('input').focus();
+    });
+    $('income-rows').addEventListener('click', e => {
+      const b = e.target.closest('.inc-del');
+      if (!b) return;
+      const row = b.closest('.income-row');
+      if ($('income-rows').children.length > 1) row.remove();
+      else row.querySelectorAll('input').forEach(i => { i.value = ''; });
+    });
 
     // import dialog
     $('import-file').addEventListener('change', e => { const f = e.target.files[0]; if (f) readImportFile(f); });
@@ -2644,9 +2954,9 @@
       armed = 0;
       b.textContent = 'Delete all data';
       snapshot();
-      S.mine = false; S.txs = makeSample(todayDn()); S.rules = Object.create(null); S.week = null;
+      S.mine = false; S.txs = makeSample(todayDn()); S.rules = Object.create(null); S.income = []; S.week = null;
       save(); refresh();
-      toast('Deleted all your expenses. Showing sample data again.', true);
+      toast('Deleted your expenses and pay. Showing sample data again.', true);
     });
     $('btn-pass').addEventListener('click', openPass);
     $('pass-form').addEventListener('submit', submitPass);
@@ -2671,7 +2981,7 @@
       if (main.clientWidth === lastW) return;
       lastW = main.clientWidth;
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => { if (V && KEY && !$('dash').hidden) { renderMonthly(V); renderWeek(V); renderWeeks(V); } });
+      frame = requestAnimationFrame(() => { if (V && KEY && !$('dash').hidden) { renderIncome(V); renderMonthly(V); renderWeek(V); renderWeeks(V); } });
     }).observe(main);
 
     boot();
