@@ -6,7 +6,7 @@
   <!-- Content Security Policy: script-src pins the inline script by its SHA-256 hash. After any edit to the
        script, update the hash or the page stops working (see CLAUDE.md). There is no connect-src, so the page
        can't send anything you enter over the network. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-K4aIqFZ53WGQSmGkHmzpyTPiexOsKBhgzg4dgYNJXfk='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DHW2GgLX9AfOItik1BH8ROxeh8+fzsVHPS2ugvumTlk='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'" />
   <meta name="referrer" content="no-referrer" />
   <meta name="robots" content="noindex" />
   <meta name="theme-color" content="#000000" />
@@ -1778,17 +1778,19 @@
     return `M${x},${y}H${x + w}V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}H${x + r}A${r},${r} 0 0 1 ${x},${y + h - r}Z`;
   }
   const signed = v => (v < 0 ? '−' : v > 0 ? '+' : '') + fmtShort(Math.abs(v));
+  const fmtMinus = v => (v < 0 ? '−' : '') + fmt(Math.abs(v));   // a true minus sign, as in the chart
   function keptChart(box, cols) {
     box.replaceChildren();
     const W = Math.max(260, Math.floor(box.clientWidth)), H = innerWidth < 640 ? 190 : 210;
     const hi = Math.max(0, ...cols.map(c => c.value)), lo = Math.max(0, ...cols.map(c => -c.value));
-    const step = niceScale(Math.max(hi, lo, 1), hi && lo ? 2 : 4).ticks[1];
+    const step = niceScale(hi + lo || 1, 4).ticks[1];   // about four steps across the whole span
     const top = Math.ceil(hi / step - 1e-9) * step, bot = Math.ceil(lo / step - 1e-9) * step;
     const ticks = [];
     for (let t = -bot; t <= top + step / 2; t += step) ticks.push(t);
     const tickText = ticks.map(t => (t < 0 ? '−' : '') + fmtShort(Math.abs(t)));
     const hasSub = cols.some(c => c.sub);
-    const m = { t: 22, r: 2, b: hasSub ? 38 : 24, l: Math.ceil(Math.max(...tickText.map(s => s.length)) * 6.4) + 12 };
+    const under = lo ? 18 : 0;   // room below the lowest bar for its label, so it never meets the month names
+    const m = { t: 22, r: 2, b: (hasSub ? 38 : 24) + under, l: Math.ceil(Math.max(...tickText.map(s => s.length)) * 6.4) + 12 };
     const pw = W - m.l - m.r, ph = H - m.t - m.b;
     const Y = v => m.t + (top - v) / ((top + bot) || 1) * ph;
     const band = pw / cols.length, bw = Math.max(3, Math.min(24, band * .6));
@@ -1811,8 +1813,8 @@
       if (c.value && (fitsAll || i === cols.length - 1)) {
         svg('text', { class: 'cap', x: cx, y: c.value > 0 ? Y(c.value) - 7 : Y(c.value) + 15, 'text-anchor': 'middle' }, caps).textContent = signed(c.value);
       }
-      if (c.label) svg('text', { class: 'xl', x: cx, y: m.t + ph + 17, 'text-anchor': 'middle' }, xs).textContent = c.label;
-      if (c.sub) svg('text', { class: 'xl', x: cx, y: m.t + ph + 31, 'text-anchor': 'middle' }, xs).textContent = c.sub;
+      if (c.label) svg('text', { class: 'xl', x: cx, y: m.t + ph + under + 17, 'text-anchor': 'middle' }, xs).textContent = c.label;
+      if (c.sub) svg('text', { class: 'xl', x: cx, y: m.t + ph + under + 31, 'text-anchor': 'middle' }, xs).textContent = c.sub;
       return g;
     });
     svg('line', { class: 'baseline', x1: m.l, x2: m.l + pw, y1: Math.round(y0) + .5, y2: Math.round(y0) + .5 }, root);
@@ -1974,7 +1976,7 @@
     fig('Earned', fmt(inc.earned), inc.z - inc.a + 1 < 28 ? 'Over ' + plural(inc.z - inc.a + 1, 'day') : 'Pay spread evenly over each month');
     fig('Spent', fmt(inc.spent), share(inc.spent, inc.earned) + ' of what you earned');
     if (inc.kept >= 0) fig('Kept', fmt(inc.kept), share(inc.kept, inc.earned) + ' of your pay', 'good');
-    else fig('Kept', fmt(inc.kept), 'Spent ' + fmt(-inc.kept) + ' more than you earned', 'bad');
+    else fig('Kept', fmtMinus(inc.kept), 'Spent ' + fmt(-inc.kept) + ' more than you earned', 'bad');
     body.append(figs);
     if (inc.filtered) body.append(make('p', 'inc-note', 'This counts all your spending, not just the categories picked above.'));
     if (inc.months.length < 2) return;
@@ -1994,11 +1996,11 @@
         label: band >= 30 ? fd('m', r.m.start) : fd('mn', r.m.start),
         sub: r.m.end > v.today && r.a <= v.today ? 'so far' : multiYear && (i === 0 || r.m.ym % 12 === 0) ? String(Math.floor(r.m.ym / 12)) : '',
         aria: fd('my', r.m.start) + ': earned ' + fmt(r.earned) + ', spent ' + fmt(r.spent) + ', ' + (r.kept >= 0 ? 'kept ' + fmt(r.kept) : 'spent ' + fmt(-r.kept) + ' more than earned'),
-        tip: () => ({ value: (r.kept < 0 ? '−' : '') + fmt(Math.abs(r.kept)), title: fd('my', r.m.start) + ' · ' + (r.kept >= 0 ? 'kept' : 'spent more than earned'), lines }),
+        tip: () => ({ value: fmtMinus(r.kept), title: fd('my', r.m.start) + ' · ' + (r.kept >= 0 ? 'kept' : 'spent more than earned'), lines }),
       };
     }));
     putTable('kept-table', [{ label: 'Month' }, { label: 'Earned', num: true }, { label: 'Spent', num: true }, { label: 'Kept', num: true }, { label: 'Share kept', num: true }],
-      inc.months.map(r => [fd('my', r.m.start), fmt(r.earned), fmt(r.spent), fmt(r.kept), r.kept >= 0 ? share(r.kept, r.earned) : '–']));
+      inc.months.map(r => [fd('my', r.m.start), fmt(r.earned), fmt(r.spent), fmtMinus(r.kept), r.kept >= 0 ? share(r.kept, r.earned) : '–']));
   }
 
   function renderMonthly(v) {
