@@ -159,7 +159,7 @@ flowchart TD
   gp -- "no or empty" --> fallback["page = home"]
   named --> init["navigate(page) without pushing history"]
   fallback --> init
-  init --> once["Bind nav and footer links once<br>Wire the mobile menu button"]
+  init --> once["Bind nav and footer links once<br>Wire the mobile menu button<br>Listen for contact-form submits on #page"]
 
   click(["Click a data-page link"]) --> go["navigate(page)"]
   back(["Back or forward button"]) --> pop["navigate(saved page) without pushing history"]
@@ -250,3 +250,5 @@ sequenceDiagram
 ```
 
 The hidden `botcheck` checkbox is a honeypot. People never see it. Bots that tick it get filtered out by Web3Forms.
+
+The form has no inline handler. One `submit` listener on `#page`, added at page load, catches it each time the Contact page is mounted. The page's Content Security Policy only allows background requests to `api.web3forms.com`, so this form is the only place the site sends data.

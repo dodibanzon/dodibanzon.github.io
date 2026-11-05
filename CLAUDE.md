@@ -24,7 +24,7 @@ There is no build step, no package manager, and no tooling configuration.
 
 | Section | Description |
 |---------|-------------|
-| HTML head | Meta tags, theme-color, favicon (inline SVG, gradient rounded square), description |
+| HTML head | Meta tags (including the Content Security Policy and referrer policy), theme-color, favicon (inline SVG, gradient rounded square), description |
 | `<style>` | All CSS: design tokens, reset, components, responsive |
 | `<body>` | Nav, `#page` mount point, footer, 6 `<template>` elements |
 | `<script>` | Client-side router, dashboard renderer, form handler |
@@ -140,7 +140,7 @@ Pushing to `main` deploys automatically via GitHub Pages. No CI/CD pipeline exis
 - **Preserve visual effects** (glass nav, gradient text, hero glow, entrance animation, live dot)
 - **Maintain the Apple-minimal aesthetic** — restraint is the point: hairline borders, muted grays, color only as accent
 - **Keep JS vanilla** — no frameworks, no npm dependencies
-- **Add new pages** by adding a `<template id="tpl-{page}">` and registering the page name in the `PAGES` array
+- **Add new pages** by adding a `<template id="tpl-{page}">` and registering the page name in the `PAGES` array (a script edit, so update the CSP hash — see [Content Security Policy](#content-security-policy))
 - **Keep `WEBFLOW.md` in sync** when you add, remove, or relink a page, or change the router, dashboard, or form flow
 
 ### What NOT to do
@@ -151,6 +151,8 @@ Pushing to `main` deploys automatically via GitHub Pages. No CI/CD pipeline exis
 - Do not add a web font — the system font stack is intentional
 - Do not modify the router logic unless fixing a specific bug
 - Do not add inline styles — use CSS classes instead (see `.spacer-sm` / `.spacer-lg`)
+- Do not add inline event handlers (`onclick="…"`) or `javascript:` links — the CSP blocks them; use `addEventListener`
+- Do not load anything from a new origin without adding it to the CSP
 - Do not re-introduce heavy decoration (noise overlays, scan lines, borders everywhere) — it breaks the minimal look
 
 ### Dashboard
@@ -165,7 +167,38 @@ Chart marks use `--accent` only (single series); every chart has a hover/focus t
 
 ### Contact Form
 
-`handleFormSubmit` POSTs the form as JSON to [Web3Forms](https://web3forms.com) (`https://api.web3forms.com/submit`), which emails the message to `dodibanzon@gmail.com`. The public access key lives in the `WEB3FORMS_KEY` constant next to the handler (safe to commit). While it is still the `YOUR_ACCESS_KEY` placeholder, the form shows a "not set up" message instead of sending. Inputs need `name` attributes (`name`, `email`, `message`), and the hidden `botcheck` checkbox (`.form-hp`) is the honeypot — keep both. Status text goes in `#form-status` (`.ok` / `.err`). Do not implement a real backend without being asked.
+`handleFormSubmit` POSTs the form as JSON to [Web3Forms](https://web3forms.com) (`https://api.web3forms.com/submit`), which emails the message to `dodibanzon@gmail.com`. The form has no inline `onsubmit`: a `submit` listener on `#page`, bound once on init, calls `handleFormSubmit` whenever the contact page is mounted. The public access key lives in the `WEB3FORMS_KEY` constant next to the handler (safe to commit; changing it is a script edit, so update the CSP hash). While it is still the `YOUR_ACCESS_KEY` placeholder, the form shows a "not set up" message instead of sending. Inputs need `name` attributes (`name`, `email`, `message`), and the hidden `botcheck` checkbox (`.form-hp`) is the honeypot — keep both. Status text goes in `#form-status` (`.ok` / `.err`). The CSP's `connect-src` allows only `https://api.web3forms.com`, so a different endpoint must be added there. Do not implement a real backend without being asked.
+
+### Content Security Policy
+
+GitHub Pages can't send security headers, so the policy is a `<meta http-equiv="Content-Security-Policy">` tag at the top of `<head>`:
+
+```
+default-src 'none'; script-src 'sha256-…'; style-src 'unsafe-inline'; img-src data:;
+connect-src https://api.web3forms.com; base-uri 'none'; form-action 'none'
+```
+
+**`script-src` pins the inline script by its SHA-256 hash.** Any edit to the script, even a comment or a space, changes the hash, and with a stale hash the browser blocks the whole script, so the site renders blank. After editing the script, run this from the repo root and replace the old hash in the CSP with the one it prints:
+
+```bash
+python3 - <<'EOF'
+import base64, hashlib, re
+html = open('index.html', encoding='utf-8').read()
+start = html.rindex('<script>') + len('<script>')
+script = html[start:html.index('</script>', start)]
+want = "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
+have = re.search(r"script-src ('sha256-[^']*')", html).group(1)
+print(want, '(matches the CSP)' if want == have else '(CSP has ' + have + ': update it)')
+EOF
+```
+
+When the hash is stale, Chrome's DevTools console also prints the one it expects ("…a hash ('sha256-…')…").
+
+- Keep the one `<script>` block: every inline script needs its own hash, and the check above reads the last one. No `eval`, `new Function` or string `setTimeout` either — the CSP blocks them.
+- No inline event handlers (`onclick="…"`) or `javascript:` links. Bind with `addEventListener`; for elements inside templates, delegate from `#page` the way the contact form does.
+- Anything loaded from another origin needs that origin in the matching directive: a fetch → `connect-src`, an image → `img-src`, a third-party script such as a captcha → `script-src` (often `frame-src` too).
+- `style-src 'unsafe-inline'` keeps the `<style>` block editable without a hash. CSS still can't load anything external, because `img-src` and `font-src` stay locked.
+- `frame-ancestors` (clickjacking protection) only works as an HTTP header, which GitHub Pages can't set. Browsers ignore it in a meta tag, so don't add it there.
 
 ## Key Identifiers
 
