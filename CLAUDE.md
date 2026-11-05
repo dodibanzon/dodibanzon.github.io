@@ -4,7 +4,7 @@
 
 **dodibanzon.github.io** is Dodi Banzon's personal developer portfolio site deployed via GitHub Pages. It is a **zero-dependency, single-file static site** — the entire application lives in `index.html`. The design is Apple-inspired: true-black background, frosted-glass nav, gradient accent text, pill buttons, and generous whitespace.
 
-One other page lives alongside it: a private **spending tracker** at `spending/index.html` (served at `/spending/`). It is self-contained the same way, and not linked from the portfolio. See [Spending tracker](#spending-tracker).
+One other page lives alongside it: a private **spending tracker** at `spending/index.html` (served at `/spending/`). It is self-contained the same way and locked with a passcode, and the portfolio nav links to it only in browsers where it has been set up. See [Spending tracker](#spending-tracker).
 
 ## File Structure
 
@@ -175,9 +175,17 @@ Chart marks use `--accent` only (single series); every chart has a hover/focus t
 
 ### Spending tracker
 
-`spending/index.html` is a personal spending dashboard: monthly spending stacked by category, a category ranking, a weekly summary, week-by-week totals, a transaction list, and a date-range + category filter that scopes all of it. It is a standalone page (not a `<template>` in the portfolio), unlinked from the portfolio nav and marked `noindex`. It copies the portfolio's tokens and card/button recipes into its own `<style>`; there are no shared files. Its `.shell` is wider (`1080px`) to give the charts room.
+`spending/index.html` is a personal spending dashboard: monthly spending stacked by category, a category ranking, a weekly summary, week-by-week totals, a transaction list, and a date-range + category filter that scopes all of it. It is a standalone page (not a `<template>` in the portfolio), marked `noindex`. It copies the portfolio's tokens and card/button recipes into its own `<style>`; there are no shared files. Its `.shell` is wider (`1080px`) to give the charts room. The portfolio nav item `#nav-spending` starts `hidden`, and `index.html` reveals it only when this browser's `localStorage` has the tracker's `spending:vault` (or the older `spending:v1`), so visitors never see the link.
 
-**Data never leaves the browser.** Expenses live in `localStorage` (`spending:v1`: `{ mine, currency, rules, txs }`; filter choices in `spending:prefs`), and the page's CSP has no `connect-src`. Until someone adds or imports their own expenses (`mine: false`), it shows a year of seeded sample data from `makeSample()`; the first add or import replaces it. Never commit real spending data to this public repo, and don't add sync, analytics or any network call without being asked.
+**Only the owner can open the data.** GitHub Pages has no logins, so the page and its code are public; the data is what's private. It stays in the browser it was entered in (the page's CSP has no `connect-src`), encrypted:
+
+- `spending:vault` is one AES-GCM ciphertext of `{ mine, currency, rules, txs }`, with a 256-bit key derived from the owner's passcode (PBKDF2-SHA256, 600,000 iterations, random salt, fresh IV on every save). The passcode is never stored, and the key exists only in memory while unlocked. Saves are queued (`save()` → `flush()`), so writes never overlap.
+- The page opens on a lock screen (`showLock()`: Private → Create a passcode, Locked, or Protect for older data) and renders nothing until the vault decrypts. Locking reloads the page (`lockNow()`): the Lock button, 15 idle minutes, and a Back/Forward restore all lock it. A forgotten passcode can't be recovered; "Forgot your passcode?" erases this browser's vault. Change passcode re-encrypts with a new salt after checking the current one.
+- The first version stored `spending:v1` unencrypted. It is encrypted and deleted when the owner sets a passcode.
+- Filter choices in `spending:prefs` aren't sensitive and stay readable.
+- Until the first add or import (`mine: false`), it shows a year of seeded sample data from `makeSample()`.
+
+Keep it that way: never store or render expense data before unlock, never write it anywhere but the vault, never commit real spending data to this public repo, and don't add sync, analytics or any network call without being asked.
 
 - **Categories** — `CATS` (Food, Subscriptions, Transport, Entertainment, Travel, Health, Shopping, Bills, Other) is the stacking and legend order. Their colors (`--c-*`, applied through `.cat-{id}` classes that set `--cat`) were validated as a set, in that order, for colorblind separation against the card surfaces. Don't reorder them or add a hue; new kinds of spending fold into Other. Text never takes a category color: a swatch or the mark beside it carries the identity.
 - **Auto-categorizing** — `RULES` maps description keywords to a category, first match wins, so specific patterns come before generic ones (GrabFood before Grab, Amazon Prime before Amazon). `CAT_ALIASES` maps an imported file's own category names. When someone changes an expense's category, every expense with the same description moves with it and the choice is remembered in `S.rules` for future imports.
@@ -226,6 +234,7 @@ When the hash is stale, Chrome's DevTools console also prints the one it expects
 | `#page` | SPA mount point where template content is rendered |
 | `#nav-toggle` | Mobile hamburger button |
 | `#nav-links` | Nav link list (toggled `.open` on mobile) |
+| `#nav-spending` | Nav item linking to the spending tracker; shown only where the tracker is set up |
 | `#year` | Injected with `new Date().getFullYear()` on init |
 | `tpl-home/experience/projects/dashboard/about/contact` | Page template elements |
 | `.shell` | Max-width centered container (980px) |

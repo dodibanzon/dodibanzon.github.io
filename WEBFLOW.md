@@ -1,6 +1,6 @@
 # Web flow
 
-How visitors move through **dodibanzon.github.io**: every page, every link, and what happens behind each click. The portfolio is one file, `index.html`. Its pages are `<template>` elements that the router swaps into `#page`, so moving between them never reloads the browser. One standalone page sits beside it: the spending tracker at `/spending/` (section 7), which the portfolio doesn't link to.
+How visitors move through **dodibanzon.github.io**: every page, every link, and what happens behind each click. The portfolio is one file, `index.html`. Its pages are `<template>` elements that the router swaps into `#page`, so moving between them never reloads the browser. One standalone page sits beside it: the private spending tracker at `/spending/` (section 7). The nav links to it only in browsers where the tracker has been set up, so visitors never see it.
 
 The diagrams are Mermaid, so GitHub draws them right in this file. In the diagrams, **solid arrows** stay on the site and **dotted arrows** leave it.
 
@@ -35,7 +35,7 @@ flowchart TD
   contact --> c1["4 contact cards<br>GitHub · Email · Substack · LinkedIn"]
   contact --> c2["Send a message form"]
 
-  site --> spend["Spending tracker<br>/spending/<br>standalone, not linked from the portfolio"]
+  site --> spend["Spending tracker<br>/spending/<br>standalone, locked with a passcode"]
   spend --> s1["Filters<br>date range · categories"]
   spend --> s2["Total · key figures"]
   spend --> s3["Charts<br>by month · by category · weekly summary · week by week"]
@@ -50,7 +50,7 @@ flowchart TD
 | Dashboard | `/#dashboard` | `tpl-dashboard` | Career data charted from the Experience and Projects cards |
 | About | `/#about` | `tpl-about` | Background, stack, profile and current focus |
 | Contact | `/#contact` | `tpl-contact` | Contact channels and a message form |
-| Spending tracker | `/spending/` | `spending/index.html` (its own file) | Private spending dashboard; data stays in the visitor's browser |
+| Spending tracker | `/spending/` | `spending/index.html` (its own file) | Private spending dashboard, locked with a passcode; data stays encrypted in the owner's browser |
 
 ## 2. Navigation map
 
@@ -59,7 +59,7 @@ The top nav and the footer appear on every page, so any page is one click from a
 ```mermaid
 flowchart LR
   subgraph chrome["On every page"]
-    nav["Top nav<br>Brand · Home · Experience · Projects<br>Dashboard · About · Contact"]
+    nav["Top nav<br>Brand · Home · Experience · Projects<br>Dashboard · About · Contact<br>Spending, only where the tracker is set up"]
     foot["Footer<br>Substack · GitHub · Contact · About"]
   end
 
@@ -81,7 +81,10 @@ flowchart LR
     w3f["Web3Forms API"]
   end
 
+  spend["Spending tracker<br>/spending/"]
+
   nav --> pages
+  nav -- "Spending, owner's browsers only" --> spend
   foot --> about
   foot --> contact
   foot -.-> substack
@@ -124,6 +127,7 @@ Internal links (`data-page`) are handled by the router. Off-site links open in a
 | Contact cards | GitHub · Substack · LinkedIn | github.com/dodibanzon · substack.com/@dodibanzon · linkedin.com/in/dodi-banzon | Off-site |
 | Contact cards | Email | `mailto:` the site's email address | Mail app |
 | Contact form | Send | api.web3forms.com/submit | Background POST |
+| Nav (only where the tracker is set up) | Spending | `/spending/` | Page load (separate page) |
 | Spending tracker footer | Dodi Banzon | Home (`/`) | Page load (separate page) |
 
 ## 3. Visitor journeys
@@ -138,6 +142,7 @@ The paths the site is built for. A click count is the number of clicks from land
 | Collaborator | Find the code | Home → footer **GitHub**, or About → **GitHub** | 1 |
 | Anyone | Get in touch fast | Any page → nav or footer **Contact** | 1 |
 | Shared link | Open a page directly | `/#projects` etc. opens that page on load | 0 |
+| Dodi | Check spending | Any page → nav **Spending** → passcode | 1 + passcode |
 
 ```mermaid
 flowchart LR
@@ -263,14 +268,34 @@ The form has no inline handler. One `submit` listener on `#page`, added at page 
 
 ## 7. Spending tracker
 
-`/spending/` is a separate page with its own file, outside the router. Nothing in the portfolio links to it, and its footer links back to Home. Everything it shows is computed in the browser from expenses kept in `localStorage`, and its Content Security Policy blocks network requests, so what someone enters never leaves their device.
+`/spending/` is a separate page with its own file, outside the router. The portfolio nav shows a **Spending** link only in browsers where the tracker has been set up (it checks that the tracker's storage exists), and the tracker's footer links back to Home.
+
+GitHub Pages has no logins, so anyone with the URL can load the page, but it opens on a lock screen and shows nothing until a passcode decrypts the data. Expenses are kept encrypted in `localStorage`, only in the browser they were entered in, and the page's Content Security Policy blocks network requests, so nothing entered leaves the device.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Private: nothing set up in this browser
+  [*] --> Locked: tracker set up here
+  [*] --> Protect: older unencrypted data found
+  Private --> Create: Set up on this device
+  Create --> Open: passcode created
+  Protect --> Open: passcode created, data encrypted
+  Locked --> Open: right passcode
+  Locked --> Locked: wrong passcode
+  Locked --> Create: Forgot it, erase and start over
+  Open --> Locked: Lock button, 15 idle minutes, reload, Back or Forward
+```
+
+Locking reloads the page, so nothing decrypted stays in memory or on screen. A forgotten passcode can't be recovered, because it isn't stored anywhere.
 
 ```mermaid
 flowchart LR
+  pass["Passcode"] --> kdf["PBKDF2-SHA256<br>600,000 rounds, random salt<br>key kept in memory only"]
+  kdf --> store
   add["Add expense dialog"] --> cat["categorize()<br>remembered choices, then keyword rules"]
   csv["Import dialog<br>CSV file or pasted rows"] --> parse["parseCSV · guessColumns<br>parseDate · parseAmount<br>skip income and duplicates"]
   parse --> cat
-  cat --> store[("localStorage<br>spending:v1")]
+  cat --> store[("localStorage<br>spending:vault<br>AES-GCM encrypted")]
   edit["Change category · delete · undo"] --> store
   store --> view["computeView()<br>date range + category filter"]
   sample["makeSample()<br>until the first add or import"] --> view
@@ -291,3 +316,6 @@ flowchart LR
 | A column in Week by week, or ‹ › | Chooses the week shown in the Weekly summary |
 | Category menu on a transaction | Moves every expense with that description, and is remembered for future imports |
 | Delete all data (click twice) | Removes your expenses and brings back the sample data; Undo restores them |
+| Lock (padlock in the nav) | Locks now; the passcode is needed to see anything again |
+| Change passcode | Re-encrypts everything with a new passcode, after checking the current one |
+| Forgot your passcode? → Erase and start over (click twice) | Deletes this browser's encrypted data and asks for a new passcode |
