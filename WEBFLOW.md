@@ -1,6 +1,6 @@
 # Web flow
 
-How visitors move through **dodibanzon.github.io**: every page, every link, and what happens behind each click. The whole site is one file, `index.html`. Pages are `<template>` elements that the router swaps into `#page`, so moving between pages never reloads the browser.
+How visitors move through **dodibanzon.github.io**: every page, every link, and what happens behind each click. The portfolio is one file, `index.html`. Its pages are `<template>` elements that the router swaps into `#page`, so moving between them never reloads the browser. One standalone page sits beside it: the spending tracker at `/spending/` (section 7), which the portfolio doesn't link to.
 
 The diagrams are Mermaid, so GitHub draws them right in this file. In the diagrams, **solid arrows** stay on the site and **dotted arrows** leave it.
 
@@ -34,6 +34,12 @@ flowchart TD
 
   contact --> c1["4 contact cards<br>GitHub · Email · Substack · LinkedIn"]
   contact --> c2["Send a message form"]
+
+  site --> spend["Spending tracker<br>/spending/<br>standalone, not linked from the portfolio"]
+  spend --> s1["Filters<br>date range · categories"]
+  spend --> s2["Total · key figures"]
+  spend --> s3["Charts<br>by month · by category · weekly summary · week by week"]
+  spend --> s4["Transactions · Your data"]
 ```
 
 | Page | URL | Template | What it's for |
@@ -44,6 +50,7 @@ flowchart TD
 | Dashboard | `/#dashboard` | `tpl-dashboard` | Career data charted from the Experience and Projects cards |
 | About | `/#about` | `tpl-about` | Background, stack, profile and current focus |
 | Contact | `/#contact` | `tpl-contact` | Contact channels and a message form |
+| Spending tracker | `/spending/` | `spending/index.html` (its own file) | Private spending dashboard; data stays in the visitor's browser |
 
 ## 2. Navigation map
 
@@ -117,6 +124,7 @@ Internal links (`data-page`) are handled by the router. Off-site links open in a
 | Contact cards | GitHub · Substack · LinkedIn | github.com/dodibanzon · substack.com/@dodibanzon · linkedin.com/in/dodi-banzon | Off-site |
 | Contact cards | Email | `mailto:` the site's email address | Mail app |
 | Contact form | Send | api.web3forms.com/submit | Background POST |
+| Spending tracker footer | Dodi Banzon | Home (`/`) | Page load (separate page) |
 
 ## 3. Visitor journeys
 
@@ -252,3 +260,34 @@ sequenceDiagram
 The hidden `botcheck` checkbox is a honeypot. People never see it. Bots that tick it get filtered out by Web3Forms.
 
 The form has no inline handler. One `submit` listener on `#page`, added at page load, catches it each time the Contact page is mounted. The page's Content Security Policy only allows background requests to `api.web3forms.com`, so this form is the only place the site sends data.
+
+## 7. Spending tracker
+
+`/spending/` is a separate page with its own file, outside the router. Nothing in the portfolio links to it, and its footer links back to Home. Everything it shows is computed in the browser from expenses kept in `localStorage`, and its Content Security Policy blocks network requests, so what someone enters never leaves their device.
+
+```mermaid
+flowchart LR
+  add["Add expense dialog"] --> cat["categorize()<br>remembered choices, then keyword rules"]
+  csv["Import dialog<br>CSV file or pasted rows"] --> parse["parseCSV · guessColumns<br>parseDate · parseAmount<br>skip income and duplicates"]
+  parse --> cat
+  cat --> store[("localStorage<br>spending:v1")]
+  edit["Change category · delete · undo"] --> store
+  store --> view["computeView()<br>date range + category filter"]
+  sample["makeSample()<br>until the first add or import"] --> view
+  view --> sum["Total · key figures"]
+  view --> mon["Spending by month"]
+  view --> cats["Where it goes"]
+  view --> wk["Weekly summary"]
+  view --> wks["Week by week"]
+  view --> tx["Transactions"]
+  wks -- "pick a week" --> wk
+  store --> exp["Export CSV<br>download"]
+```
+
+| Control | Effect |
+|---|---|
+| Date presets (Month · 3M · 6M · YTD · 1Y · All) or From / To | Sets the range for every number and chart on the page |
+| Category chips | All categories, or only the ones picked |
+| A column in Week by week, or ‹ › | Chooses the week shown in the Weekly summary |
+| Category menu on a transaction | Moves every expense with that description, and is remembered for future imports |
+| Delete all data (click twice) | Removes your expenses and brings back the sample data; Undo restores them |

@@ -4,14 +4,18 @@
 
 **dodibanzon.github.io** is Dodi Banzon's personal developer portfolio site deployed via GitHub Pages. It is a **zero-dependency, single-file static site** — the entire application lives in `index.html`. The design is Apple-inspired: true-black background, frosted-glass nav, gradient accent text, pill buttons, and generous whitespace.
 
+One other page lives alongside it: a private **spending tracker** at `spending/index.html` (served at `/spending/`). It is self-contained the same way, and not linked from the portfolio. See [Spending tracker](#spending-tracker).
+
 ## File Structure
 
 ```
 dodibanzon.github.io/
-├── index.html     # Entire application (HTML + CSS + JS)
-├── README.md      # Minimal readme
-├── WEBFLOW.md     # Site flow: sitemap, navigation map, router/dashboard/form flows (Mermaid)
-└── CLAUDE.md      # This file
+├── index.html           # Entire portfolio (HTML + CSS + JS)
+├── spending/
+│   └── index.html       # Spending tracker (HTML + CSS + JS), standalone
+├── README.md            # Minimal readme
+├── WEBFLOW.md           # Site flow: sitemap, navigation map, router/dashboard/form flows (Mermaid)
+└── CLAUDE.md            # This file
 ```
 
 There is no build step, no package manager, and no tooling configuration.
@@ -134,7 +138,7 @@ Pushing to `main` deploys automatically via GitHub Pages. No CI/CD pipeline exis
 
 ### What to do
 
-- **Keep everything in `index.html`** — do not split into separate CSS/JS files unless explicitly asked
+- **Keep everything in `index.html`** — do not split into separate CSS/JS files unless explicitly asked (the spending tracker is the one other page, and it keeps its own CSS and JS inline too)
 - **Use existing CSS variables** for all colors, gradients, and easing
 - **Follow BEM-like naming**: `.component-element` pattern
 - **Preserve visual effects** (glass nav, gradient text, hero glow, entrance animation, live dot)
@@ -169,6 +173,18 @@ Chart marks use `--accent` only (single series); every chart has a hover/focus t
 
 `handleFormSubmit` POSTs the form as JSON to [Web3Forms](https://web3forms.com) (`https://api.web3forms.com/submit`), which emails the message to `dodibanzon@gmail.com`. The form has no inline `onsubmit`: a `submit` listener on `#page`, bound once on init, calls `handleFormSubmit` whenever the contact page is mounted. The public access key lives in the `WEB3FORMS_KEY` constant next to the handler (safe to commit; changing it is a script edit, so update the CSP hash). While it is still the `YOUR_ACCESS_KEY` placeholder, the form shows a "not set up" message instead of sending. Inputs need `name` attributes (`name`, `email`, `message`), and the hidden `botcheck` checkbox (`.form-hp`) is the honeypot — keep both. Status text goes in `#form-status` (`.ok` / `.err`). The CSP's `connect-src` allows only `https://api.web3forms.com`, so a different endpoint must be added there. Do not implement a real backend without being asked.
 
+### Spending tracker
+
+`spending/index.html` is a personal spending dashboard: monthly spending stacked by category, a category ranking, a weekly summary, week-by-week totals, a transaction list, and a date-range + category filter that scopes all of it. It is a standalone page (not a `<template>` in the portfolio), unlinked from the portfolio nav and marked `noindex`. It copies the portfolio's tokens and card/button recipes into its own `<style>`; there are no shared files. Its `.shell` is wider (`1080px`) to give the charts room.
+
+**Data never leaves the browser.** Expenses live in `localStorage` (`spending:v1`: `{ mine, currency, rules, txs }`; filter choices in `spending:prefs`), and the page's CSP has no `connect-src`. Until someone adds or imports their own expenses (`mine: false`), it shows a year of seeded sample data from `makeSample()`; the first add or import replaces it. Never commit real spending data to this public repo, and don't add sync, analytics or any network call without being asked.
+
+- **Categories** — `CATS` (Food, Subscriptions, Transport, Entertainment, Travel, Health, Shopping, Bills, Other) is the stacking and legend order. Their colors (`--c-*`, applied through `.cat-{id}` classes that set `--cat`) were validated as a set, in that order, for colorblind separation against the card surfaces. Don't reorder them or add a hue; new kinds of spending fold into Other. Text never takes a category color: a swatch or the mark beside it carries the identity.
+- **Auto-categorizing** — `RULES` maps description keywords to a category, first match wins, so specific patterns come before generic ones (GrabFood before Grab, Amazon Prime before Amazon). `CAT_ALIASES` maps an imported file's own category names. When someone changes an expense's category, every expense with the same description moves with it and the choice is remembered in `S.rules` for future imports.
+- **Import** — `parseCSV` (comma, semicolon or tab; quoted fields), `guessColumns` (by header name, then by content), `parseDate` (ISO, M/D/Y or D/M/Y detected from the data, month names, spreadsheet serials) and `parseAmount` (₱/commas/parentheses/`DR`·`CR`/decimal commas). With mixed signs, whichever sign most rows have is spending. Rows already present are skipped as duplicates; real repeats in a new file are kept.
+- **Charts** — months, weeks and days all go through one `columnChart()`: stacked columns no wider than 24px, a 2px gap between segments, rounded tops, the whole band as the hover target, arrow keys between columns, and a "Data table" twin. One shared `#tip` tooltip. Weeks start on Monday; averages count complete months and weeks only.
+- Editing the script changes its hash, so run the check in [Content Security Policy](#content-security-policy) afterwards.
+
 ### Content Security Policy
 
 GitHub Pages can't send security headers, so the policy is a `<meta http-equiv="Content-Security-Policy">` tag at the top of `<head>`:
@@ -178,19 +194,22 @@ default-src 'none'; script-src 'sha256-…'; style-src 'unsafe-inline'; img-src 
 connect-src https://api.web3forms.com; base-uri 'none'; form-action 'none'
 ```
 
-**`script-src` pins the inline script by its SHA-256 hash.** Any edit to the script, even a comment or a space, changes the hash, and with a stale hash the browser blocks the whole script, so the site renders blank. After editing the script, run this from the repo root and replace the old hash in the CSP with the one it prints:
+**`script-src` pins the inline script by its SHA-256 hash.** Any edit to the script, even a comment or a space, changes the hash, and with a stale hash the browser blocks the whole script, so the site renders blank. Both pages carry their own policy and hash. After editing either script, run this from the repo root and replace the old hash in that page's CSP with the one it prints:
 
 ```bash
 python3 - <<'EOF'
 import base64, hashlib, re
-html = open('index.html', encoding='utf-8').read()
-start = html.rindex('<script>') + len('<script>')
-script = html[start:html.index('</script>', start)]
-want = "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
-have = re.search(r"script-src ('sha256-[^']*')", html).group(1)
-print(want, '(matches the CSP)' if want == have else '(CSP has ' + have + ': update it)')
+for path in ['index.html', 'spending/index.html']:
+    html = open(path, encoding='utf-8').read()
+    start = html.rindex('<script>') + len('<script>')
+    script = html[start:html.index('</script>', start)]
+    want = "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
+    have = re.search(r"script-src ('sha256-[^']*')", html).group(1)
+    print(path, want, '(matches the CSP)' if want == have else '(CSP has ' + have + ': update it)')
 EOF
 ```
+
+`spending/index.html` uses the same policy without `connect-src`, so it can't make any network request. Keep it that way.
 
 When the hash is stale, Chrome's DevTools console also prints the one it expects ("…a hash ('sha256-…')…").
 

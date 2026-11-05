@@ -1,0 +1,2367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Content Security Policy: script-src pins the inline script by its SHA-256 hash. After any edit to the
+       script, update the hash or the page stops working (see CLAUDE.md). There is no connect-src, so the page
+       can't send anything you enter over the network. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wnNihI9xQ1yR5Rgk941PhLkBEMr/VPP4NbJDKJUpx5o='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#000000" />
+  <title>Spending</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%232997ff'/><stop offset='1' stop-color='%23bf5af2'/></linearGradient></defs><rect width='100' height='100' rx='23' fill='url(%23g)'/><g fill='white'><rect x='22' y='50' width='14' height='28' rx='4'/><rect x='43' y='36' width='14' height='42' rx='4'/><rect x='64' y='22' width='14' height='56' rx='4'/></g></svg>" />
+  <meta name="description" content="A private spending tracker: monthly spending by category, a weekly summary and a date-range filter. Runs entirely in your browser." />
+
+  <style>
+    /* ── Tokens (shared with the portfolio's index.html) ── */
+    :root {
+      color-scheme: dark;
+      --bg:        #000000;
+      --bg2:       #0a0a0c;
+      --surface:   #1d1d1f;
+      --surface2:  #161617;
+      --border:    rgba(255,255,255,.1);
+      --text:      #f5f5f7;
+      --text2:     #d2d2d7;
+      --muted:     #86868b;
+      --accent:    #2997ff;
+      --accent-btn:       #0071e3;
+      --accent-btn-hover: #0077ed;
+      --purple:    #bf5af2;
+      --cyan:      #64d2ff;
+      --green:     #30d158;
+      --red:       #ff453a;
+      --grad:      linear-gradient(110deg, #2997ff 0%, #bf5af2 55%, #ff375f 100%);
+      --ease:      cubic-bezier(.28,.11,.32,1);
+
+      /* chart chrome */
+      --grid:      rgba(255,255,255,.07);
+      --baseline:  rgba(255,255,255,.22);
+
+      /* Category colors. Validated as a set for colorblind separation against the card surfaces,
+         in exactly this order (it is also the stacking and legend order). Don't reorder them or add
+         a hue: anything new folds into Other. See CLAUDE.md. */
+      --c-food:          #d95926;
+      --c-subscriptions: #199e70;
+      --c-transport:     #3987e5;
+      --c-entertainment: #e66767;
+      --c-travel:        #9085e9;
+      --c-health:        #008300;
+      --c-shopping:      #d55181;
+      --c-bills:         #c98500;
+      --c-other:         #7c7c80;
+    }
+    .cat-food          { --cat: var(--c-food); }
+    .cat-subscriptions { --cat: var(--c-subscriptions); }
+    .cat-transport     { --cat: var(--c-transport); }
+    .cat-entertainment { --cat: var(--c-entertainment); }
+    .cat-travel        { --cat: var(--c-travel); }
+    .cat-health        { --cat: var(--c-health); }
+    .cat-shopping      { --cat: var(--c-shopping); }
+    .cat-bills         { --cat: var(--c-bills); }
+    .cat-other         { --cat: var(--c-other); }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1.0625rem;
+      line-height: 1.47;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; text-decoration: none; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    ::selection { background: var(--accent-btn); color: #fff; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    [hidden] { display: none !important; }
+
+    .shell { max-width: 1080px; margin: 0 auto; padding: 0 1.375rem; }
+    .section-label {
+      display: inline-block;
+      width: fit-content;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: -.01em;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      margin-bottom: .75rem;
+    }
+
+    /* ── Nav (frosted glass, as on the portfolio) ── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: .7rem 0;
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      background: rgba(22,22,23,.8);
+    }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .brand { display: inline-flex; align-items: center; gap: .55rem; font-size: 1.0625rem; font-weight: 600; letter-spacing: -.01em; }
+    .brand svg { width: 24px; height: 24px; flex: none; }
+    .nav-actions { display: flex; gap: .5rem; }
+    .nav-actions .btn { gap: 0; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      padding: .75rem 1.5rem;
+      border-radius: 980px;
+      font-size: 1.0625rem;
+      letter-spacing: -.014em;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      white-space: nowrap;
+      transition: background .25s var(--ease), color .25s var(--ease), transform .25s var(--ease);
+    }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .btn-sm { padding: .45rem 1rem; font-size: .875rem; }
+    .btn-primary { background: var(--accent-btn); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-btn-hover); }
+    .btn-ghost { background: rgba(255,255,255,.08); color: var(--text); }
+    .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,.14); }
+    .btn-danger { color: var(--red); }
+    .btn-row { display: flex; flex-wrap: wrap; gap: .6rem; }
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 0;
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      font-size: 1.15rem;
+      line-height: 1;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: background .2s var(--ease);
+    }
+    .icon-btn:hover:not(:disabled) { background: rgba(255,255,255,.15); }
+    .icon-btn:disabled { opacity: .3; cursor: default; }
+
+    /* ── Page head ── */
+    .page-head { padding: 3.75rem 0 2rem; }
+    .page-head h1 {
+      font-size: clamp(2.25rem, 5vw, 3.5rem);
+      font-weight: 700;
+      letter-spacing: -.022em;
+      line-height: 1.08;
+      margin-bottom: .75rem;
+    }
+    .page-sub { color: var(--muted); font-size: 1.1875rem; letter-spacing: -.014em; max-width: 54ch; }
+
+    /* sample-data banner */
+    .banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem 1.25rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      border-radius: 18px;
+      border: 1px solid rgba(41,151,255,.28);
+      background: linear-gradient(135deg, rgba(41,151,255,.12), rgba(191,90,242,.1));
+    }
+    .banner-text { font-size: .9375rem; color: var(--text2); max-width: 62ch; }
+    .banner-text strong { color: var(--text); font-weight: 600; }
+
+    /* ── Filters: one row above everything they scope ── */
+    #dash { display: grid; gap: 1.125rem; }
+    .filters { display: flex; flex-direction: column; gap: .85rem; margin-bottom: .4rem; }
+    .filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
+    .seg { display: inline-flex; padding: 3px; gap: 2px; background: rgba(255,255,255,.07); border-radius: 980px; }
+    .seg button {
+      border: 0;
+      background: transparent;
+      color: var(--text2);
+      font-size: .8125rem;
+      font-weight: 500;
+      padding: .4rem .85rem;
+      border-radius: 980px;
+      cursor: pointer;
+      transition: background .2s var(--ease), color .2s var(--ease);
+    }
+    .seg button:hover { color: var(--text); }
+    .seg button[aria-pressed="true"] { background: rgba(255,255,255,.17); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+    .dates { display: flex; align-items: center; gap: .5rem; }
+    .date-field { display: inline-flex; align-items: center; gap: .45rem; font-size: .8125rem; color: var(--muted); }
+    .date-field input {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      padding: .32rem .55rem;
+      font-size: .8125rem;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .date-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(41,151,255,.2); }
+    .dates-sep { color: var(--muted); }
+    .chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .34rem .8rem;
+      border-radius: 980px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: transparent;
+      color: var(--text2);
+      font-size: .8125rem;
+      cursor: pointer;
+      transition: background .2s var(--ease), border-color .2s var(--ease), color .2s var(--ease);
+    }
+    .chip:hover { border-color: rgba(255,255,255,.22); color: var(--text); }
+    .chip[aria-pressed="true"] { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.26); color: var(--text); }
+    .chip-all { padding-left: .9rem; padding-right: .9rem; }
+
+    /* ── Cards (same recipe as the portfolio's cards) ── */
+    .card {
+      background: linear-gradient(180deg, var(--surface), var(--surface2));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 24px;
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .card-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: .75rem 1rem; margin-bottom: 1.25rem; }
+    .card-label { font-size: .8125rem; font-weight: 600; color: var(--muted); }
+    .card-title { font-size: 1.375rem; font-weight: 600; letter-spacing: -.018em; margin-top: .15rem; }
+    .card-sub { color: var(--muted); font-size: .875rem; line-height: 1.5; margin-top: .25rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.125rem; align-items: stretch; }
+    .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--cat); flex: none; }
+
+    /* summary: total + key figures */
+    .summary { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.125rem; }
+    .total-card { gap: 0; }
+    .hero-num {
+      font-size: clamp(2.75rem, 6.5vw, 4.25rem);
+      font-weight: 700;
+      letter-spacing: -.03em;
+      line-height: 1.05;
+      margin: .4rem 0 .45rem;
+      width: fit-content;
+      max-width: 100%;
+      background: var(--grad);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    .delta { font-size: .875rem; font-weight: 600; margin-top: .55rem; display: flex; align-items: baseline; gap: .4rem; }
+    .delta:empty { display: none; }
+    .delta.up { color: var(--red); }
+    .delta.down { color: var(--green); }
+    .delta.flat { color: var(--muted); font-weight: 500; }
+    .delta-arrow { font-size: .7em; }
+    .total-card .segbar { margin-top: auto; padding-top: 1.5rem; }
+    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 1.125rem; }
+    .kpi {
+      background: linear-gradient(180deg, var(--surface), var(--surface2));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 20px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+      min-width: 0;
+    }
+    .kpi-value { font-size: 1.625rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; display: flex; align-items: center; gap: .5rem; min-width: 0; }
+    .kpi-value .sw { width: 12px; height: 12px; }
+    .kpi-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .kpi-sub {
+      font-size: .8125rem;
+      color: var(--muted);
+      line-height: 1.4;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    /* thin segmented bar: one whole split into its categories */
+    .segbar { display: flex; gap: 2px; height: 8px; box-sizing: content-box; }
+    .segbar span { position: relative; flex: 1 1 0; min-width: 3px; background: var(--cat); }
+    .segbar span::before { content: ''; position: absolute; inset: -8px 0; }
+    .segbar span:first-child { border-radius: 4px 0 0 4px; }
+    .segbar span:last-child { border-radius: 0 4px 4px 0; }
+    .segbar span:only-child { border-radius: 4px; }
+
+    /* legend (rect swatches mirror the bars) */
+    .legend { display: flex; flex-wrap: wrap; gap: .35rem 1rem; margin: -.35rem 0 1rem; font-size: .8125rem; color: var(--text2); }
+    .legend span { display: inline-flex; align-items: center; gap: .4rem; }
+
+    /* ── Charts ── */
+    .chart { position: relative; width: 100%; }
+    .chart-svg { display: block; overflow: visible; touch-action: pan-y; }
+    .chart-svg text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+    .chart-svg .cap { fill: var(--text2); font-weight: 600; }
+    .chart-svg .xl.sel { fill: var(--text); font-weight: 600; }
+    .chart-svg .xl.mute { fill: rgba(134,134,139,.45); }
+    .chart-svg .grid { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+    .chart-svg .baseline { stroke: var(--baseline); stroke-width: 1; shape-rendering: crispEdges; }
+    .chart-svg .avg { stroke: rgba(245,245,247,.5); stroke-width: 1; shape-rendering: crispEdges; }
+    .chart-svg .avg-label { fill: var(--text2); }
+    .chart-svg .sel-band { fill: rgba(255,255,255,.06); }
+    .chart-svg.pickable .col { cursor: pointer; }
+    .seg { fill: var(--cat); transition: opacity .2s var(--ease); }
+    .col { transition: opacity .2s var(--ease); }
+    .col:focus { outline: none; }
+    .col .ring { fill: none; stroke: transparent; stroke-width: 2; }
+    .col:focus-visible .ring { stroke: var(--accent); }
+    .col.muted .seg { opacity: .4; }
+    .chart-svg.hovering .col:not(.on) { opacity: .35; }
+    .chart-svg .col.on.has-seg .seg:not(.on) { opacity: .5; }
+    .chart-empty { color: var(--muted); font-size: .9375rem; padding: 2.5rem 0; text-align: center; }
+
+    /* tooltip */
+    .tip {
+      position: fixed;
+      z-index: 300;
+      pointer-events: none;
+      min-width: 170px;
+      max-width: 300px;
+      padding: .7rem .85rem;
+      background: rgba(44,44,46,.94);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.5);
+      font-size: .8125rem;
+      line-height: 1.45;
+      display: flex;
+      flex-direction: column;
+      gap: .1rem;
+    }
+    .tip-value { font-size: 1.0625rem; font-weight: 600; color: var(--text); }
+    .tip-title { color: var(--text2); }
+    .tip-line { color: var(--muted); }
+    .tip-rows {
+      display: grid;
+      grid-template-columns: 12px 1fr auto auto;
+      align-items: center;
+      gap: .2rem .55rem;
+      margin: .4rem 0 .15rem;
+      padding-top: .45rem;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .tip-row { display: contents; }
+    .tip-key { height: 2px; border-radius: 1px; background: var(--cat); }
+    .tip-label { color: var(--text2); }
+    .tip-num { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+    .tip-pct { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; min-width: 2.2em; }
+    .tip-row.on .tip-label, .tip-row.on .tip-num { color: var(--text); font-weight: 600; }
+    .tip-row.on .tip-key { height: 3px; }
+
+    /* table view (accessibility twin of each chart) */
+    .data { margin-top: auto; padding-top: 1.25rem; font-size: .8125rem; }
+    .data summary { width: fit-content; color: var(--accent); cursor: pointer; list-style: none; border-radius: 6px; }
+    .data summary::-webkit-details-marker { display: none; }
+    .data summary::after { content: '›'; display: inline-block; margin-left: .35rem; transition: transform .2s var(--ease); }
+    .data[open] summary::after { transform: rotate(90deg); }
+    .data-wrap { overflow-x: auto; margin-top: .75rem; }
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th, .data-table td { text-align: left; vertical-align: top; padding: .45rem .75rem .45rem 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .data-table th:last-child, .data-table td:last-child { padding-right: 0; }
+    .data-table th { color: var(--muted); font-weight: 500; }
+    .data-table td { color: var(--text2); }
+    .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* categories: ranked bars */
+    .cat-list { display: flex; flex-direction: column; gap: .15rem; }
+    .cat-row {
+      display: grid;
+      grid-template-columns: 8.75rem 1fr 5.75rem 2.6rem;
+      align-items: center;
+      gap: .85rem;
+      min-height: 38px;
+      padding: 0 .5rem;
+      margin: 0 -.5rem;
+      border-radius: 10px;
+      transition: background .2s var(--ease);
+    }
+    .cat-row:hover { background: rgba(255,255,255,.04); }
+    .cat-row:focus-visible { outline-offset: 0; }
+    .cat-name { display: flex; align-items: center; gap: .55rem; font-size: .9375rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cat-track { height: 10px; }
+    .cat-fill { display: block; height: 100%; min-width: 3px; background: var(--cat); border-radius: 0 4px 4px 0; transform-origin: left center; }
+    .cat-amt { text-align: right; font-weight: 600; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+    .cat-share { text-align: right; color: var(--muted); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+
+    /* weekly summary */
+    .week-nav { display: flex; align-items: center; gap: .4rem; font-size: .875rem; color: var(--text2); white-space: nowrap; }
+    .week-nav span { min-width: 7.5rem; text-align: center; }
+    .week-num { font-size: 2.375rem; font-weight: 700; letter-spacing: -.025em; line-height: 1.1; }
+    .week-num small { font-size: .95rem; font-weight: 500; color: var(--muted); letter-spacing: -.01em; margin-left: .35rem; }
+    .day-chart { margin: 1.4rem 0 1.2rem; }
+    .week-cats { display: flex; flex-direction: column; gap: .4rem; margin-top: .95rem; }
+    .wk-row { display: grid; grid-template-columns: 10px 1fr auto 2.6rem; align-items: center; gap: .6rem; font-size: .875rem; }
+    .wk-name { color: var(--text2); }
+    .wk-amt { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .wk-share { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .wk-more { color: var(--muted); font-size: .8125rem; padding-left: 1.6rem; }
+    .week-foot, .card-foot { color: var(--muted); font-size: .8125rem; line-height: 1.5; margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--border); }
+    .card-foot { margin-top: auto; }
+    .cat-list { margin-bottom: 1.25rem; }
+
+    /* transactions */
+    .search {
+      width: 15rem;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 980px;
+      padding: .45rem .95rem;
+      font-size: .875rem;
+      color: var(--text);
+    }
+    .search::placeholder { color: var(--muted); }
+    .search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(41,151,255,.2); }
+    .tx-list { list-style: none; }
+    .tx-day {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.1rem 0 .45rem;
+      border-bottom: 1px solid var(--border);
+      font-size: .8125rem;
+      font-weight: 600;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .tx-day:first-child { padding-top: 0; }
+    .tx { display: grid; grid-template-columns: 40px 1fr auto 32px; align-items: center; gap: .85rem; padding: .6rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+    .tx-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      line-height: 1;
+      background: color-mix(in srgb, var(--cat) 24%, transparent);
+      border: 1px solid color-mix(in srgb, var(--cat) 40%, transparent);
+    }
+    .tx-main { min-width: 0; display: flex; flex-direction: column; gap: .05rem; }
+    .tx-desc { font-size: .9375rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-cat {
+      width: fit-content;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 0;
+      border-radius: 6px;
+      background: transparent url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%2386868b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right center / 8px 5px;
+      padding: 0 14px 0 0;
+      color: var(--muted);
+      font-size: .8125rem;
+      cursor: pointer;
+    }
+    .tx-cat:hover { color: var(--text2); }
+    .tx-amt { font-weight: 600; font-size: .9375rem; font-variant-numeric: tabular-nums; text-align: right; }
+    .tx-del {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.15rem;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity .2s var(--ease), background .2s var(--ease), color .2s var(--ease);
+    }
+    .tx:hover .tx-del, .tx-del:focus-visible { opacity: 1; }
+    .tx-del:hover { background: rgba(255,69,58,.14); color: var(--red); }
+    @media (hover: none) { .tx-del { opacity: .75; } }
+    .tx-more { align-self: center; margin-top: 1.25rem; }
+
+    /* your data */
+    .data-card { flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 1.25rem 2rem; margin: 1.125rem 0 0; }
+    .data-card .card-sub { max-width: 60ch; }
+    .data-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+    .inline-field { display: inline-flex; align-items: center; gap: .5rem; font-size: .8125rem; color: var(--muted); }
+    .pill-select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: rgba(255,255,255,.08) url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23d2d2d7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right .8rem center / 8px 5px;
+      border: 0;
+      border-radius: 980px;
+      padding: .45rem 2rem .45rem .95rem;
+      font-size: .875rem;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    /* empty state */
+    .empty { align-items: center; text-align: center; padding: 3rem 1.5rem; gap: .5rem; margin-bottom: 1.125rem; }
+    .empty-icon { font-size: 2.25rem; line-height: 1; margin-bottom: .5rem; }
+    .empty .card-sub { max-width: 46ch; margin-bottom: 1rem; }
+    .empty .btn-row { justify-content: center; }
+
+    /* ── Dialogs ── */
+    dialog {
+      margin: auto;
+      width: min(560px, calc(100vw - 2rem));
+      max-height: calc(100dvh - 2rem);
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding: 0;
+      color: var(--text);
+      background: linear-gradient(180deg, #232325, var(--surface2));
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 22px;
+      box-shadow: 0 30px 80px rgba(0,0,0,.6);
+    }
+    dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .dlg { display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; }
+    .dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .dlg-head h2 { font-size: 1.375rem; font-weight: 600; letter-spacing: -.018em; }
+    .dlg-sub { color: var(--muted); font-size: .9375rem; margin-top: -.4rem; }
+    .dlg-foot {
+      position: sticky;
+      bottom: 0;
+      display: flex;
+      justify-content: flex-end;
+      gap: .6rem;
+      margin: .25rem -1.5rem -1.5rem;
+      padding: 1rem 1.5rem 1.5rem;
+      background: linear-gradient(180deg, rgba(22,22,23,.85), var(--surface2) 40%);
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .field label, .field > span { display: block; font-size: .875rem; font-weight: 500; color: var(--text2); margin-bottom: .4rem; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 1rem;
+      letter-spacing: -.01em;
+      padding: .65rem .9rem;
+      transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+    }
+    .field select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: rgba(0,0,0,.35) url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23d2d2d7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right .9rem center / 9px 6px;
+      padding-right: 2.2rem;
+    }
+    .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(41,151,255,.2); }
+    .field textarea { resize: vertical; min-height: 120px; font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; font-size: .8125rem; }
+    .field-amt input { font-size: 1.75rem; font-weight: 600; letter-spacing: -.02em; padding: .5rem .9rem; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; }
+    .form-status { font-size: .875rem; color: var(--muted); }
+    .form-status:empty { display: none; }
+    .form-status.err { color: var(--red); }
+
+    .drop {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .15rem;
+      padding: 1.4rem 1rem;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.04);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s var(--ease), background .2s var(--ease);
+    }
+    .drop:hover, .drop.over { border-color: var(--accent); background: rgba(41,151,255,.08); }
+    .drop:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(41,151,255,.2); }
+    .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+    .drop-title { font-weight: 600; font-size: .9375rem; }
+    .drop-sub { color: var(--muted); font-size: .8125rem; }
+    .paste summary { width: fit-content; color: var(--accent); cursor: pointer; font-size: .875rem; list-style: none; border-radius: 6px; }
+    .paste summary::-webkit-details-marker { display: none; }
+    .paste[open] summary { margin-bottom: .6rem; }
+    .map-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+    .map-grid .field label { font-size: .8125rem; }
+    .map-grid .field select { font-size: .875rem; padding: .5rem 2rem .5rem .75rem; border-radius: 10px; }
+    .import-summary { font-size: .875rem; color: var(--text2); line-height: 1.5; }
+    .import-preview { margin-top: .9rem; font-size: .8125rem; }
+    .import-preview td:nth-child(2) { white-space: normal; }
+    .import-cats { display: flex; flex-wrap: wrap; gap: .3rem .9rem; font-size: .8125rem; color: var(--text2); margin-top: .5rem; }
+    .import-cats span { display: inline-flex; align-items: center; gap: .4rem; }
+    .import-cats b { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .check { display: flex; align-items: center; gap: .55rem; font-size: .875rem; color: var(--text2); cursor: pointer; }
+    .check input { width: 16px; height: 16px; accent-color: var(--accent-btn); }
+
+    /* toast */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 1.5rem;
+      z-index: 400;
+      display: flex;
+      align-items: center;
+      gap: .9rem;
+      max-width: calc(100vw - 2rem);
+      padding: .6rem .6rem .6rem 1.1rem;
+      border-radius: 980px;
+      background: rgba(44,44,46,.96);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 16px 40px rgba(0,0,0,.55);
+      font-size: .875rem;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 16px);
+      transition: opacity .25s var(--ease), transform .25s var(--ease);
+    }
+    .toast:empty { padding: 0; border: 0; }
+    .toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+    .toast-btn { border: 0; border-radius: 980px; padding: .35rem .85rem; background: rgba(255,255,255,.12); color: var(--accent); font-weight: 600; font-size: .875rem; cursor: pointer; }
+    .toast-btn:hover { background: rgba(255,255,255,.18); }
+
+    /* footer */
+    .footer {
+      border-top: 1px solid var(--border);
+      margin-top: 3.5rem;
+      padding: 1.75rem 0 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: .75rem;
+      color: var(--muted);
+    }
+    .footer a:hover { color: var(--text); text-decoration: underline; }
+
+    /* ── Entrance (first render only) ── */
+    @keyframes growY { from { transform: scaleY(0); } }
+    @keyframes growX { from { transform: scaleX(0); } }
+    @keyframes fade { from { opacity: 0; } }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+    .anim .page-head > *, .anim .filters, .anim .summary { animation: rise .6s var(--ease) both; }
+    .anim .page-head > :nth-child(2) { animation-delay: .05s; }
+    .anim .page-head > :nth-child(3), .anim .filters { animation-delay: .1s; }
+    .anim .summary { animation-delay: .15s; }
+    .anim .bars { transform-box: fill-box; transform-origin: 50% 100%; animation: growY .8s .1s var(--ease) both; }
+    .anim .caps, .anim .avg-layer { animation: fade .5s .55s var(--ease) both; }
+    .anim .cat-fill, .anim .segbar { transform-origin: left center; animation: growX .8s .15s var(--ease) both; }
+
+    /* ── Responsive ── */
+    @media (max-width: 880px) { .summary { grid-template-columns: 1fr; } }
+    @media (max-width: 780px) { .split { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) {
+      .shell { padding: 0 1rem; }
+      .page-head { padding: 2.5rem 0 1.5rem; }
+      .page-sub { font-size: 1.0625rem; }
+      .card { padding: 1.25rem; border-radius: 20px; }
+      .kpis { gap: .75rem; }
+      .kpi { padding: 1rem; border-radius: 18px; }
+      .kpi-value { font-size: 1.3rem; }
+      .cat-row { grid-template-columns: 1fr auto 2.6rem; grid-template-areas: "name amt share" "track track track"; row-gap: .4rem; padding-top: .5rem; padding-bottom: .5rem; }
+      .cat-name { grid-area: name; }
+      .cat-track { grid-area: track; height: 8px; }
+      .cat-amt { grid-area: amt; }
+      .cat-share { grid-area: share; }
+      .card-head > .search { width: 100%; }
+      .filter-row { flex-direction: column; align-items: stretch; }
+      .seg button { flex: 1; padding-left: .3rem; padding-right: .3rem; }
+      .dates { display: grid; grid-template-columns: 1fr auto 1fr; }
+      .date-field { min-width: 0; }
+      .date-field span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+      .date-field input { width: 100%; min-width: 0; }
+      .map-grid { grid-template-columns: 1fr 1fr; }
+      .field-row { grid-template-columns: 1fr; }
+      .data-card { flex-direction: column; align-items: stretch; }
+      .tx { gap: .7rem; }
+    }
+    @media (max-width: 400px) {
+      .hide-xs { display: none; }
+      .seg button { padding: .4rem .62rem; }
+      .week-nav span { min-width: 0; }
+    }
+
+    /* ── Reduced motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-delay: 0s !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="shell nav-inner">
+    <a class="brand" href="./">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="brand-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2997ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient></defs><rect width="24" height="24" rx="6" fill="url(#brand-g)"/><g fill="#fff"><rect x="5.25" y="12" width="3.25" height="6.75" rx="1"/><rect x="10.4" y="8.5" width="3.25" height="10.25" rx="1"/><rect x="15.5" y="5.25" width="3.25" height="13.5" rx="1"/></g></svg>
+      Spending
+    </a>
+    <div class="nav-actions">
+      <button class="btn btn-ghost btn-sm" type="button" data-action="import">Import</button>
+      <button class="btn btn-primary btn-sm" type="button" data-action="add">Add<span class="hide-xs">&nbsp;expense</span></button>
+    </div>
+  </div>
+</nav>
+
+<main class="shell" id="main">
+  <header class="page-head">
+    <p class="section-label">Money</p>
+    <h1>Where your money went.</h1>
+    <p class="page-sub">Monthly and weekly spending by category. It's all worked out in your browser, and nothing you enter leaves it.</p>
+  </header>
+
+  <section class="banner" id="sample-banner" hidden>
+    <p class="banner-text"><strong>You're looking at sample data.</strong> These are made-up expenses so you can see how everything works. Add an expense or import a CSV and they're replaced with yours.</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-sm" type="button" data-action="import">Import CSV</button>
+      <button class="btn btn-primary btn-sm" type="button" data-action="add">Add expense</button>
+    </div>
+  </section>
+
+  <section class="card empty" id="empty-state" hidden>
+    <span class="empty-icon" aria-hidden="true">🧾</span>
+    <h2 class="card-title">No expenses yet.</h2>
+    <p class="card-sub">Add your first one, or import a CSV from your bank, e-wallet or a spreadsheet.</p>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-sm" type="button" data-action="add">Add expense</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-action="import">Import CSV</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-action="sample">Show sample data</button>
+    </div>
+  </section>
+
+  <div id="dash">
+    <section class="filters" aria-label="Filters">
+      <div class="filter-row">
+        <div class="seg" id="presets" role="group" aria-label="Date range"></div>
+        <div class="dates">
+          <label class="date-field"><span>From</span><input type="date" id="from" required /></label>
+          <span class="dates-sep" aria-hidden="true">–</span>
+          <label class="date-field"><span>To</span><input type="date" id="to" required /></label>
+        </div>
+      </div>
+      <div class="chips" id="chips" role="group" aria-label="Categories"></div>
+    </section>
+
+    <section class="summary" aria-label="Summary">
+      <div class="card total-card">
+        <p class="card-label" id="total-label">Total spent</p>
+        <p class="hero-num" id="total">–</p>
+        <p class="card-sub" id="total-sub"></p>
+        <p class="delta" id="total-delta"></p>
+        <div class="segbar" id="total-bar"></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <p class="card-label">Monthly</p>
+          <h2 class="card-title">Spending by month.</h2>
+          <p class="card-sub" id="monthly-sub"></p>
+        </div>
+      </div>
+      <div class="legend" id="monthly-legend"></div>
+      <div class="chart" id="monthly-chart"></div>
+      <div id="monthly-table"></div>
+    </section>
+
+    <div class="split">
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-label">Categories</p>
+            <h2 class="card-title">Where it goes.</h2>
+            <p class="card-sub" id="cats-sub"></p>
+          </div>
+        </div>
+        <div class="cat-list" id="cats"></div>
+        <p class="card-foot">Hover or tap a category to see its biggest expenses.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-label">Weekly summary</p>
+            <h2 class="card-title" id="week-title">This week.</h2>
+          </div>
+          <div class="week-nav">
+            <button class="icon-btn" type="button" id="week-prev" aria-label="Previous week">‹</button>
+            <span id="week-range" aria-live="polite"></span>
+            <button class="icon-btn" type="button" id="week-next" aria-label="Next week">›</button>
+          </div>
+        </div>
+        <p class="week-num" id="week-total"></p>
+        <p class="delta" id="week-delta"></p>
+        <p class="card-sub" id="week-avg"></p>
+        <div class="chart day-chart" id="day-chart"></div>
+        <div class="segbar" id="week-bar"></div>
+        <div class="week-cats" id="week-cats"></div>
+        <p class="week-foot" id="week-foot"></p>
+        <div id="day-table"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <p class="card-label">Weekly</p>
+          <h2 class="card-title">Week by week.</h2>
+          <p class="card-sub" id="weeks-sub"></p>
+        </div>
+      </div>
+      <div class="legend" id="weeks-legend"></div>
+      <div class="chart" id="weeks-chart"></div>
+      <div id="weeks-table"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <p class="card-label">Transactions</p>
+          <h2 class="card-title">Every expense.</h2>
+          <p class="card-sub" id="tx-sub"></p>
+        </div>
+        <input class="search" type="search" id="tx-search" placeholder="Search" aria-label="Search expenses" autocomplete="off" />
+      </div>
+      <ul class="tx-list" id="tx-list"></ul>
+      <p class="chart-empty" id="tx-empty" hidden>No expenses match.</p>
+      <button class="btn btn-ghost btn-sm tx-more" type="button" id="tx-more" hidden>Show more</button>
+    </section>
+  </div>
+
+  <section class="card data-card" aria-label="Your data">
+    <div>
+      <p class="card-label">Your data</p>
+      <h2 class="card-title">Stays on this device.</h2>
+      <p class="card-sub" id="data-status"></p>
+    </div>
+    <div class="data-actions">
+      <label class="inline-field">Currency <select class="pill-select" id="currency"></select></label>
+      <button class="btn btn-ghost btn-sm" type="button" data-action="import">Import CSV</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="btn-export">Export CSV</button>
+      <button class="btn btn-ghost btn-sm btn-danger" type="button" id="btn-clear">Delete all data</button>
+    </div>
+  </section>
+</main>
+
+<footer class="shell">
+  <div class="footer">
+    <span>Spending · private to this browser</span>
+    <a href="../">Dodi Banzon</a>
+  </div>
+</footer>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ██ ADD EXPENSE ██ -->
+<dialog id="add-dialog" aria-labelledby="add-title">
+  <form class="dlg" id="add-form" novalidate>
+    <div class="dlg-head">
+      <h2 id="add-title">Add an expense</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field field-amt">
+      <label for="add-amt">Amount</label>
+      <input id="add-amt" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="add-desc">What was it?</label>
+      <input id="add-desc" type="text" placeholder="e.g. Jollibee, Grab to work, Netflix" maxlength="120" autocomplete="off" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="add-cat">Category</label>
+        <select id="add-cat"></select>
+      </div>
+      <div class="field">
+        <label for="add-date">Date</label>
+        <input id="add-date" type="date" />
+      </div>
+    </div>
+    <p class="form-status err" id="add-status" role="alert"></p>
+    <div class="dlg-foot">
+      <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary btn-sm" type="submit">Add expense</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ██ IMPORT ██ -->
+<dialog id="import-dialog" aria-labelledby="import-title">
+  <form class="dlg" id="import-form" novalidate>
+    <div class="dlg-head">
+      <h2 id="import-title">Import expenses</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close">×</button>
+    </div>
+    <p class="dlg-sub">A CSV from your bank, e-wallet or a spreadsheet. It needs a date, a description and an amount; a category column is optional, since categories are detected from the descriptions. The file is read here and never uploaded.</p>
+    <label class="drop" id="drop">
+      <input type="file" id="import-file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" />
+      <span class="drop-title">Choose a CSV file</span>
+      <span class="drop-sub">or drop it here</span>
+    </label>
+    <details class="paste" id="paste">
+      <summary>Or paste rows</summary>
+      <div class="field">
+        <textarea id="import-text" rows="6" aria-label="Rows to import" placeholder="Date,Description,Amount&#10;2026-11-03,Jollibee,245&#10;2026-11-03,Grab ride,186.50"></textarea>
+      </div>
+    </details>
+    <div id="import-map" hidden>
+      <div class="map-grid">
+        <div class="field"><label for="map-date">Date column</label><select id="map-date"></select></div>
+        <div class="field"><label for="map-desc">Description column</label><select id="map-desc"></select></div>
+        <div class="field"><label for="map-amt">Amount column</label><select id="map-amt"></select></div>
+        <div class="field"><label for="map-cat">Category column</label><select id="map-cat"></select></div>
+        <div class="field"><label for="map-fmt">Dates are</label>
+          <select id="map-fmt"><option value="auto">Detect</option><option value="mdy">Month first (11/03/2026)</option><option value="dmy">Day first (03/11/2026)</option></select>
+        </div>
+        <div class="field"><label for="map-sign">Spending is</label>
+          <select id="map-sign"><option value="auto">Detect</option><option value="neg">Negative amounts</option><option value="pos">Positive amounts</option><option value="all">Every row</option></select>
+        </div>
+      </div>
+    </div>
+    <div id="import-result" hidden>
+      <p class="import-summary" id="import-summary"></p>
+      <div class="import-cats" id="import-cats"></div>
+      <div class="data-wrap import-preview" id="import-preview"></div>
+    </div>
+    <label class="check" id="replace-wrap" hidden><input type="checkbox" id="import-replace" /> Replace my existing expenses instead of adding to them</label>
+    <p class="form-status err" id="import-status" role="alert"></p>
+    <div class="dlg-foot">
+      <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary btn-sm" type="submit" id="import-go" disabled>Import</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ██ SCRIPT ██ -->
+<script>
+  // This script is pinned by hash in the Content-Security-Policy meta tag in the head.
+  // After editing it, update that hash or the page stops working (see CLAUDE.md).
+  'use strict';
+
+  // ── Categories ──────────────────────────────────
+  // The order is the stacking and legend order. The colors (--c-* in the CSS) were validated
+  // for colorblind separation in this order, so keep it; new kinds of spending fold into Other.
+  const CATS = [
+    { id: 'food',          name: 'Food',          icon: '🍜', hint: 'Dining, delivery, coffee and groceries' },
+    { id: 'subscriptions', name: 'Subscriptions', icon: '🔁', hint: 'Streaming, apps and cloud storage' },
+    { id: 'transport',     name: 'Transport',     icon: '🚕', hint: 'Rides, fares, fuel, parking and tolls' },
+    { id: 'entertainment', name: 'Entertainment', icon: '🎬', hint: 'Movies, games, concerts and nights out' },
+    { id: 'travel',        name: 'Travel',        icon: '✈️', hint: 'Flights, hotels and tours' },
+    { id: 'health',        name: 'Health',        icon: '💊', hint: 'Pharmacy, doctors, fitness and personal care' },
+    { id: 'shopping',      name: 'Shopping',      icon: '🛍️', hint: 'Online orders, clothes, gadgets and home' },
+    { id: 'bills',         name: 'Bills',         icon: '💡', hint: 'Electricity, water, internet, phone and rent' },
+    { id: 'other',         name: 'Other',         icon: '📦', hint: 'Gifts, fees, courses and anything unrecognized' },
+  ];
+  const CAT = Object.assign(Object.create(null), Object.fromEntries(CATS.map(c => [c.id, c])));
+
+  // Description keywords → category. The first match wins, so specific rules come first
+  // (GrabFood before Grab, Amazon Prime before Amazon). Anything unmatched is Other.
+  const RULES = [
+    ['subscriptions', /netflix|spotify|youtube\s*(premium|music)|yt\s*premium|disney\s*(\+|plus)|\bhbo\b|prime\s*video|amazon\s*prime|apple\.com\/bill|itunes|icloud|google\s*(one|storage)|chatgpt|openai|claude\.ai|anthropic|midjourney|adobe|canva|notion|dropbox|microsoft\s*365|office\s*365|game\s*pass|playstation\s*plus|ps\s*plus|nintendo\s*switch\s*online|patreon|substack|duolingo|crunchyroll|\bviu\b|iwant|vivamax|apple\s*(music|tv|one|arcade)|github|1password|nordvpn|expressvpn|subscription/i],
+    ['food', /grab\s*food|grab\s*mart|food\s*panda|panda\s*mart|jollibee|\bmcdo\b|mcdonald|\bkfc\b|chowking|greenwich|mang\s*inasal|army\s*navy|kenny\s*rogers|starbucks|coffee|caf[eé]\b|bakery|bake\s*shop|restaurant|\bresto\b|dining|eatery|kitchen|grill|pizza|burger|ramen|sushi|\bbbq\b|milk\s*tea|boba|7-?eleven|ministop|family\s*mart|lawson|dunkin|krispy|shakey|yellow\s*cab|bonchon|tim\s*hortons|bistro|grocer|supermarket|savemore|puregold|landers|\bs\s*&\s*r\b|metro\s*mart|waltermart|alfamart|\bmarket\b|palengke|\bfood|snack|lunch|dinner|breakfast|brunch|\bmeals?\b|bread|\bdeli\b|donut|doughnut|chicken|lechon|carinderia|canteen|cafeteria|samgyup|seafood|steak|noodle|dumpling|dim\s*sum|chatime|gong\s*cha|coco\s*fresh|tiger\s*sugar|potato\s*corner|wildflour|ice\s*cream|gelato|dessert/i],
+    ['transport', /\bgrab\b|uber|lyft|angkas|joyride|move\s*it|taxi|\bcab\b|tricycle|jeep|\bbus\b|\bmrt\b|\blrt\b|\bbeep\b|\bp2p\b|\btrain\b|ferry|petron|\bshell\b|caltex|seaoil|cleanfuel|unioil|\bfuel|gasoline|gas\s*station|diesel|parking|\btolls?\b|autosweep|easytrip|\brfid\b|nlex|slex|skyway|car\s*wash|\bfare\b|commute|transport/i],
+    ['bills', /meralco|maynilad|manila\s*water|\bpldt\b|\bglobe\b|smart\s*(postpaid|prepaid|signature|bro)|converge|sky\s*(cable|fiber|broadband)|\bdito\b|electric|internet|broadband|fiber|wi-?fi|postpaid|prepaid|\bload\b|\brent\b|landlord|condo|association\s*dues|\bdues\b|\bhoa\b|utilit|insurance|cignal|mortgage|amortization|\bbills?\b/i],
+    ['health', /mercury\s*drug|watsons|southstar|rose\s*pharmacy|generika|\btgp\b|pharma|drug\s*store|drugstore|\bdrugs?\b|clinic|hospital|medical|medicine|dental|dentist|doctor|\blab(oratory)?\b|hi-?precision|optical|eyewear|\bgym\b|fitness|yoga|pilates|crossfit|\bspa\b|massage|salon|barber|haircut|derma|vitamin|health|maxicare|intellicare|philhealth|check-?up|therapy|skin\s*care|skincare/i],
+    ['travel', /cebu\s*pac|philippine\s*airlines|\bpal\b|air\s*asia|airasia|airline|airways|airport|airfare|\bflights?\b|\bplane\b|airbnb|agoda|booking\.com|expedia|trivago|hotel|resort|klook|traveloka|trip\.com|hostel|\binn\b|travel|\btours?\b|island\s*hopping|visa\s*fee|terminal\s*fee|baggage|luggage|duty\s*free/i],
+    ['entertainment', /cinema|movie|imax|concert|tickets?\b|ticketnet|steam|playstation|\bpsn\b|nintendo|xbox|epic\s*games|valorant|mobile\s*legends|codashop|\bgames?\b|gaming|karaoke|\bktv\b|videoke|bowling|billiards|arcade|timezone|museum|theme\s*park|enchanted\s*kingdom|\bzoo\b|\bbar\b|\bpub\b|\bclub\b|nightlife|festival|theater|theatre|comedy|escape\s*room|amusement/i],
+    ['shopping', /shopee|lazada|amazon|zalora|uniqlo|h\s*&\s*m\b|\bzara\b|sm\s*store|department\s*store|\bmall\b|ikea|ace\s*hardware|wilcon|handyman|true\s*value|abenson|anson|power\s*mac|beyond\s*the\s*box|digital\s*walker|datablitz|book\s*store|bookstore|fully\s*booked|daiso|miniso|muji|\bnike\b|adidas|temu|shein|aliexpress|\betsy\b|ebay|\bshop|\bstore\b|apparel|clothing|clothes|shoes|electronics|gadget|appliance|furniture|toy\s*kingdom|\btoys?\b|decathlon|penshoppe|outlet|boutique/i],
+  ];
+
+  // Category names in an imported "Category" column → these categories
+  const CAT_ALIASES = [
+    ['food', /food|dining|restaurant|grocer|coffee|drinks?\b|\beat|meal|snack/i],
+    ['subscriptions', /subscri|streaming|software|recurring|membership|\bapps?\b/i],
+    ['transport', /transport|commut|\bauto|\bcar\b|fuel|\bgas\b|taxi|\brides?\b|parking|fare/i],
+    ['entertainment', /entertain|leisure|\bfun\b|\bgames?|movie|hobb|recreation|music|nightlife|going\s*out/i],
+    ['travel', /travel|vacation|\btrips?\b|flight|hotel|holiday|lodging/i],
+    ['health', /health|medic|pharm|fitness|\bgym\b|wellness|personal\s*care|beauty|doctor|dental/i],
+    ['shopping', /shop|cloth|apparel|electronic|household|\bhome\b|gadget|merch|retail/i],
+    ['bills', /bill|utilit|\brent\b|housing|mortgage|internet|phone|insurance|electric|water|telecom/i],
+    ['other', /other|misc|gift|donat|educat|tuition|fees?\b|charity|uncategori/i],
+  ];
+
+  // ── Helpers ─────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  function make(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svg(tag, attrs, parent) {
+    const n = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.append(n);
+    return n;
+  }
+  const LOCALE = 'en-PH';
+  const plural = (n, one, many = one + 's') => n.toLocaleString(LOCALE) + ' ' + (n === 1 ? one : many);
+  const sum = (arr, f = t => t.amt) => arr.reduce((s, x) => s + f(x), 0);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const uid = () => Math.random().toString(36).slice(2, 9) + (Date.now() % 1e7).toString(36);
+  const clip = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+  const normKey = s => String(s).toLowerCase().replace(/[^a-z&]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+
+  // ── Money ───────────────────────────────────────
+  const CURRENCIES = ['PHP', 'USD', 'EUR', 'GBP', 'JPY', 'SGD', 'AUD', 'CAD', 'HKD', 'KRW', 'INR', 'MYR', 'THB', 'IDR', 'AED'];
+  let NF = null;
+  function setCurrency(code) {
+    const base = { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' };
+    NF = {
+      whole: new Intl.NumberFormat(LOCALE, { ...base, minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+      exact: new Intl.NumberFormat(LOCALE, base),
+      short: new Intl.NumberFormat(LOCALE, { ...base, notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 }),
+    };
+  }
+  const fmt = v => NF.whole.format(v);
+  const fmtExact = v => Math.abs(v - Math.round(v)) < .005 ? NF.whole.format(v) : NF.exact.format(v);
+  const fmtShort = v => Math.abs(v) < 1000 ? NF.whole.format(v) : NF.short.format(v);
+  function share(part, whole) {
+    if (!whole) return '–';
+    const p = part / whole * 100;
+    return p > 0 && p < 1 ? '<1%' : Math.round(p) + '%';
+  }
+  const symbolOf = code => new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' })
+    .formatToParts(0).find(p => p.type === 'currency').value;
+
+  // ── Dates ───────────────────────────────────────
+  // Dates are whole days counted from 1970-01-01 ("day numbers"), so there are no time-zone surprises.
+  const DAY = 864e5;
+  const dnOf = iso => { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d) / DAY; };
+  const isoOf = dn => new Date(dn * DAY).toISOString().slice(0, 10);
+  const todayDn = () => { const t = new Date(); return Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / DAY; };
+  const ymOf = dn => { const d = new Date(dn * DAY); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
+  const ymStart = ym => Date.UTC(Math.floor(ym / 12), ym % 12, 1) / DAY;
+  const ymEnd = ym => ymStart(ym + 1) - 1;
+  const yearOf = dn => new Date(dn * DAY).getUTCFullYear();
+  const dateOf = dn => new Date(dn * DAY).getUTCDate();
+  const dow = dn => (new Date(dn * DAY).getUTCDay() + 6) % 7;   // 0 = Monday
+  const weekOf = dn => dn - dow(dn);                               // weeks start on Monday
+  function addMonths(dn, k) {                                      // same day k months away, clamped to the month
+    const ym = ymOf(dn) + k;
+    return Math.min(ymStart(ym) + dateOf(dn) - 1, ymEnd(ym));
+  }
+  const DF = o => new Intl.DateTimeFormat(LOCALE, { timeZone: 'UTC', ...o });
+  const DATES = {
+    md: DF({ month: 'short', day: 'numeric' }),
+    mdy: DF({ month: 'short', day: 'numeric', year: 'numeric' }),
+    wmd: DF({ weekday: 'short', month: 'short', day: 'numeric' }),
+    wmdl: DF({ weekday: 'long', month: 'long', day: 'numeric' }),
+    m: DF({ month: 'short' }),
+    mn: DF({ month: 'narrow' }),
+    my: DF({ month: 'long', year: 'numeric' }),
+    wd: DF({ weekday: 'short' }),
+    wdl: DF({ weekday: 'long' }),
+  };
+  const fd = (f, dn) => DATES[f].format(new Date(dn * DAY));
+  function span(a, b) {                       // "Jun 1 – Nov 5, 2026", "Nov 1–5, 2026"
+    if (a === b) return fd('mdy', a);
+    if (yearOf(a) !== yearOf(b)) return fd('mdy', a) + ' – ' + fd('mdy', b);
+    if (ymOf(a) === ymOf(b)) return fd('md', a) + '–' + dateOf(b) + ', ' + yearOf(b);
+    return fd('md', a) + ' – ' + fd('mdy', b);
+  }
+  function shortSpan(a, b) {                  // like span(), without the year when it's this year
+    const year = yearOf(b) === yearOf(todayDn()) ? '' : ', ' + yearOf(b);
+    if (ymOf(a) === ymOf(b)) return fd('md', a) + '–' + dateOf(b) + year;
+    return fd('md', a) + ' – ' + fd('md', b) + year;
+  }
+  function dayName(dn, today) {
+    if (dn === today) return 'Today';
+    if (dn === today - 1) return 'Yesterday';
+    return fd('wmd', dn) + (yearOf(dn) === yearOf(today) ? '' : ', ' + yearOf(dn));
+  }
+
+  // ── Categorizing ────────────────────────────────
+  const S = {
+    mine: false,                  // false = showing sample data
+    txs: [],                      // { id, d: 'YYYY-MM-DD', dn, desc, amt (positive), cat }
+    rules: Object.create(null),   // normalized description → category, learned from your edits
+    currency: 'PHP',
+    preset: '6m', from: null, to: null,
+    only: new Set(),              // categories picked in the filter (empty = all)
+    week: null,                   // Monday of the week in the weekly summary
+    query: '', limit: 30,
+  };
+  let V = null, storageOk = true, undoState = null;
+
+  function categorize(desc) {
+    const key = normKey(desc);
+    if (key && S.rules[key]) return S.rules[key];
+    for (const [cat, re] of RULES) if (re.test(desc)) return cat;
+    return 'other';
+  }
+  function mapCategory(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    const exact = CATS.find(c => c.id === s.toLowerCase() || c.name.toLowerCase() === s.toLowerCase());
+    if (exact) return exact.id;
+    for (const [id, re] of CAT_ALIASES) if (re.test(s)) return id;
+    return null;
+  }
+
+  // ── Storage (this browser only) ─────────────────
+  const STORE = 'spending:v1', PREFS = 'spending:prefs';
+  function readStore(key) {
+    let raw = null;
+    try { raw = localStorage.getItem(key); } catch { storageOk = false; }
+    try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+  }
+  function cleanTx(t) {
+    if (!t || typeof t.d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t.d)) return null;
+    const amt = Number(t.amt);
+    if (!(amt > 0) || !Number.isFinite(amt)) return null;
+    return { id: String(t.id || uid()), d: t.d, dn: dnOf(t.d), desc: String(t.desc ?? '').slice(0, 200),
+      amt: Math.round(amt * 100) / 100, cat: typeof t.cat === 'string' && CAT[t.cat] ? t.cat : 'other' };
+  }
+  function load() {
+    const d = readStore(STORE);
+    if (d && typeof d === 'object') {
+      if (CURRENCIES.includes(d.currency)) S.currency = d.currency;
+      if (d.rules && typeof d.rules === 'object') {
+        for (const [k, c] of Object.entries(d.rules)) if (typeof c === 'string' && CAT[c]) S.rules[k] = c;
+      }
+      if (d.mine === true && Array.isArray(d.txs)) { S.mine = true; S.txs = d.txs.map(cleanTx).filter(Boolean); }
+    }
+    const p = readStore(PREFS);
+    if (p && typeof p === 'object') {
+      if (PRESETS.some(x => x.id === p.preset)) S.preset = p.preset;
+      if (p.preset === 'custom' && Number.isInteger(p.from) && Number.isInteger(p.to)) { S.preset = 'custom'; S.from = p.from; S.to = p.to; }
+      if (Array.isArray(p.only)) S.only = new Set(p.only.filter(id => typeof id === 'string' && CAT[id]));
+    }
+    if (!S.mine) S.txs = makeSample(todayDn());
+  }
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        v: 1, mine: S.mine, currency: S.currency, rules: S.rules,
+        txs: S.mine ? S.txs.map(({ id, d, desc, amt, cat }) => ({ id, d, desc, amt, cat })) : [],
+      }));
+      storageOk = true;
+    } catch { storageOk = false; }
+  }
+  function savePrefs() {
+    try { localStorage.setItem(PREFS, JSON.stringify({ preset: S.preset, from: S.from, to: S.to, only: [...S.only] })); } catch { /* per-browser convenience only */ }
+  }
+  function snapshot() {
+    undoState = { mine: S.mine, rules: Object.assign(Object.create(null), S.rules), txs: S.txs.map(t => ({ ...t })) };
+  }
+  function undo() {
+    if (!undoState) return;
+    Object.assign(S, undoState);
+    undoState = null;
+    S.week = null;
+    save();
+    refresh();
+  }
+
+  // ── Sample data ─────────────────────────────────
+  // A year of made-up expenses ending today, shown until you add your own. Seeded, so it's stable.
+  function mulberry32(a) {
+    return () => {
+      a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeSample(end) {
+    const rnd = mulberry32(42);
+    const R = (a, b) => a + rnd() * (b - a);
+    const pick = a => a[Math.floor(rnd() * a.length)];
+    const r5 = v => Math.round(v / 5) * 5;          // ₱245
+    const r9 = v => Math.round(v / 10) * 10 - 1;    // ₱1,249
+    const out = [];
+    const add = (dn, desc, amt, cat) => out.push({ id: 's' + out.length, d: isoOf(dn), dn, desc, amt: Math.round(amt * 100) / 100, cat });
+    const trips = [end - 248, end - 104];
+    const misc = [['Birthday gift', 800, 2500], ['Donation', 200, 1000], ['Udemy course', 449, 649], ['LBC Express', 180, 450], ['Bank transfer fee', 15, 25]];
+    for (let dn = end - 364; dn <= end; dn++) {
+      const day = dow(dn), dom = dateOf(dn), mon = ymOf(dn) % 12;
+      const weekend = day >= 5, dec = mon === 11, away = trips.some(t => dn >= t && dn < t + 4);
+      // food
+      if (away) add(dn, pick(['Seafood restaurant', 'Beachfront cafe', 'Lechon house']), r5(R(450, 1600)), 'food');
+      else if (!weekend) {
+        if (rnd() < .5) add(dn, pick(['Starbucks', "Bo's Coffee", 'Tim Hortons', 'Coffee Project']), r5(R(140, 235)), 'food');
+        if (rnd() < .72) add(dn, pick(['Jollibee', 'Mang Inasal', 'Chowking', '7-Eleven', 'Army Navy', 'Kenny Rogers']), r5(R(150, 360)), 'food');
+        if (rnd() < .22) add(dn, pick(['GrabFood', 'foodpanda']), r5(R(320, 780)), 'food');
+      } else {
+        if (rnd() < .5) add(dn, pick(['Ramen Nagi', "Shakey's Pizza", 'Bonchon Chicken', 'Wildflour Cafe', 'Mesa Restaurant']), r5(R(650, 2100) * (dec ? 1.35 : 1)), 'food');
+        if (day === 5 && rnd() < .75) add(dn, pick(['SM Supermarket', 'Puregold', 'S&R', 'Landers']), R(1800, 3900), 'food');
+      }
+      // transport
+      if (away) { if (rnd() < .7) add(dn, 'Tricycle', r5(R(60, 200)), 'transport'); }
+      else if (!weekend) {
+        if (day === 0) add(dn, 'Beep card load', 500, 'transport');
+        if (rnd() < .3) add(dn, 'Grab ride', r5(R(170, 420)), 'transport');
+        if (rnd() < .18) add(dn, 'Angkas', r5(R(85, 190)), 'transport');
+      } else if (rnd() < .45) add(dn, 'Grab ride', r5(R(190, 520)), 'transport');
+      // subscriptions (Disney+ cancelled and ChatGPT added partway through the year)
+      if (dom === 5) add(dn, 'Netflix', 549, 'subscriptions');
+      if (dom === 12) add(dn, 'Spotify Premium', 169, 'subscriptions');
+      if (dom === 18) add(dn, 'iCloud+ 200GB', 149, 'subscriptions');
+      if (dom === 21) add(dn, 'YouTube Premium', 189, 'subscriptions');
+      if (dom === 9 && dn < end - 150) add(dn, 'Disney+', 369, 'subscriptions');
+      if (dom === 24 && dn > end - 200) add(dn, 'ChatGPT Plus', 1150, 'subscriptions');
+      // bills (electricity peaks in the hot months)
+      if (dom === 15) add(dn, 'Meralco', mon >= 3 && mon <= 5 ? R(4200, 5300) : R(2600, 3500), 'bills');
+      if (dom === 20) add(dn, 'PLDT Fiber', 1699, 'bills');
+      if (dom === 8) add(dn, 'Globe Postpaid', 999, 'bills');
+      if (dom === 17) add(dn, 'Maynilad', R(380, 640), 'bills');
+      // entertainment
+      if (weekend && !away && rnd() < .17) add(dn, pick(['SM Cinema', 'Ayala Malls Cinemas', 'Timezone', 'Karaoke night', 'Codashop']), r5(R(300, 1400)), 'entertainment');
+      if (rnd() < .02) add(dn, 'Steam', r9(R(250, 1800)), 'entertainment');
+      if (dn === end - 160) add(dn, 'SM Tickets', 6500, 'entertainment');
+      // shopping (December gifts)
+      if (rnd() < (dec ? .38 : .1)) {
+        add(dn, pick(dec ? ['Shopee', 'Lazada', 'SM Store', 'Toy Kingdom', 'Uniqlo'] : ['Shopee', 'Shopee', 'Lazada', 'Uniqlo', 'National Book Store', 'Ace Hardware']),
+          r9(R(199, dec ? 3600 : 2300)), 'shopping');
+      }
+      // health
+      if (dom === 1) add(dn, 'Anytime Fitness', 2500, 'health');
+      if (rnd() < .04) add(dn, pick(['Mercury Drug', 'Watsons', 'Southstar Drug']), r5(R(180, 1100)), 'health');
+      if (dom === 27 && mon % 2 === 0) add(dn, 'Bench Fix Salon', r5(R(350, 650)), 'health');
+      // travel: two getaways, booked a month ahead
+      for (const t of trips) {
+        if (dn === t - 34) add(dn, 'Cebu Pacific', r5(R(5200, 8900)), 'travel');
+        if (dn === t - 27) add(dn, 'Agoda', r5(R(7800, 13500)), 'travel');
+        if (dn === t + 1) add(dn, 'Island hopping tour', r5(R(1500, 3200)), 'travel');
+      }
+      // other
+      if (rnd() < .03) { const [name, lo, hi] = pick(misc); add(dn, name, r5(R(lo, hi)), 'other'); }
+    }
+    return out;
+  }
+
+  // ── The view: everything the page shows, for the current filters ──
+  const PRESETS = [
+    { id: 'month', label: 'Month', title: 'This month' },
+    { id: '3m', label: '3M', title: 'Last 3 months' },
+    { id: '6m', label: '6M', title: 'Last 6 months' },
+    { id: 'ytd', label: 'YTD', title: 'Year to date' },
+    { id: '12m', label: '1Y', title: 'Last 12 months' },
+    { id: 'all', label: 'All', title: 'All time' },
+  ];
+  const PRESET_MONTHS = { month: 1, '3m': 3, '6m': 6, ytd: 12, '12m': 12 };
+
+  function computeView() {
+    const today = todayDn();
+    let lo = Infinity, hi = -Infinity;
+    for (const t of S.txs) { if (t.dn < lo) lo = t.dn; if (t.dn > hi) hi = t.dn; }
+    const b = S.txs.length ? [lo, hi] : null;
+    // Presets end today, or at your last expense if everything is from before this month (an old import).
+    const anchor = b && b[1] < ymStart(ymOf(today)) ? b[1] : today;
+    let from, to;
+    if (S.preset === 'custom' && S.from != null && S.to != null) {
+      from = Math.min(S.from, S.to); to = Math.max(S.from, S.to);
+    } else if (S.preset === 'all') {
+      from = b ? b[0] : anchor; to = b ? Math.max(b[1], anchor) : anchor;
+    } else {
+      if (!PRESET_MONTHS[S.preset]) S.preset = '6m';
+      const ym = ymOf(anchor);
+      from = ymStart(S.preset === 'ytd' ? ym - ym % 12 : ym - PRESET_MONTHS[S.preset] + 1);
+      to = anchor;
+    }
+    const vis = c => !S.only.size || S.only.has(c);
+    const list = S.txs.filter(t => t.dn >= from && t.dn <= to && vis(t.cat));
+    // Days the data actually covers: nothing before your first expense, nothing after today/your last one.
+    const covFrom = b ? Math.max(from, b[0]) : from;
+    const covTo = b ? Math.min(to, Math.max(b[1], anchor)) : to;
+    const covDays = Math.max(0, covTo - covFrom + 1);
+
+    const byCat = Object.create(null);
+    let total = 0, biggest = null;
+    for (const t of list) {
+      const c = byCat[t.cat] || (byCat[t.cat] = { amt: 0, n: 0 });
+      c.amt += t.amt; c.n++; total += t.amt;
+      if (!biggest || t.amt > biggest.amt) biggest = t;
+    }
+    const ym0 = ymOf(from), w0 = weekOf(from);
+    const months = [], weeks = [];
+    for (let ym = ym0; ym <= ymOf(to); ym++) months.push({ ym, start: ymStart(ym), end: ymEnd(ym), cats: {}, total: 0, n: 0 });
+    for (let w = w0; w <= weekOf(to); w += 7) weeks.push({ w, cats: {}, total: 0, n: 0 });
+    for (const t of list) {
+      for (const x of [months[ymOf(t.dn) - ym0], weeks[(weekOf(t.dn) - w0) / 7]]) {
+        x.cats[t.cat] = (x.cats[t.cat] || 0) + t.amt; x.total += t.amt; x.n++;
+      }
+    }
+    // Averages only count complete months and weeks, so a half-finished one doesn't drag them down.
+    const complete = (a, z) => a >= from && z <= to && a >= covFrom && z <= covTo;
+    const fullMonths = months.filter(m => complete(m.start, m.end));
+    const fullWeeks = weeks.filter(x => complete(x.w, x.w + 6));
+    const monthAvg = fullMonths.length ? sum(fullMonths, m => m.total) / fullMonths.length : null;
+    const weekAvg = fullWeeks.length ? sum(fullWeeks, x => x.total) / fullWeeks.length : null;
+
+    // The period before, for the comparison: the same span a few months back for month presets.
+    const k = PRESET_MONTHS[S.preset];
+    const pFrom = k ? addMonths(from, -k) : from - (to - from + 1);
+    const pTo = k ? addMonths(to, -k) : from - 1;
+    const prevTotal = S.preset !== 'all' && b && b[0] <= pFrom
+      ? sum(S.txs.filter(t => t.dn >= pFrom && t.dn <= pTo && vis(t.cat))) : null;
+
+    const fallbackWeek = weekOf(clamp(covTo, from, to));
+    const week = S.week != null && S.week >= weeks[0].w && S.week <= weeks[weeks.length - 1].w ? S.week : fallbackWeek;
+    return { today, b, anchor, from, to, vis, list, covFrom, covTo, covDays, byCat, total, biggest,
+      months, weeks, fullMonths, fullWeeks, monthAvg, weekAvg, pFrom, pTo, prevTotal, week };
+  }
+
+  // ── Tooltip ─────────────────────────────────────
+  // One shared tooltip. Everything it shows is also in a label, the list, or a "Data table".
+  function tipShow(t, x, y) {
+    const el = $('tip');
+    el.replaceChildren(make('strong', 'tip-value', t.value), make('span', 'tip-title', t.title));
+    if (t.rows && t.rows.length) {
+      const grid = make('div', 'tip-rows');
+      for (const r of t.rows) {
+        const row = make('div', 'tip-row cat-' + r.cat + (r.on ? ' on' : ''));
+        row.append(make('span', 'tip-key'), make('span', 'tip-label', r.label), make('span', 'tip-num', r.value), make('span', 'tip-pct', r.pct));
+        grid.append(row);
+      }
+      el.append(grid);
+    }
+    for (const l of t.lines || []) el.append(make('span', 'tip-line', l));
+    el.hidden = false;
+    tipPlace(x, y);
+  }
+  function tipPlace(x, y) {
+    const el = $('tip'), pad = 10, w = el.offsetWidth, h = el.offsetHeight;
+    let left = x + 14, top = y + 14;
+    if (left + w > innerWidth - pad) left = x - w - 14;
+    if (top + h > innerHeight - pad) top = y - h - 14;
+    el.style.left = clamp(left, pad, Math.max(pad, innerWidth - w - pad)) + 'px';
+    el.style.top = Math.max(pad, top) + 'px';
+  }
+  function tipHide() { $('tip').hidden = true; }
+  function bindTip(el, get, label) {
+    el.dataset.tip = '';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', label);
+    el.addEventListener('pointerenter', e => tipShow(get(), e.clientX, e.clientY));
+    el.addEventListener('pointermove', e => tipPlace(e.clientX, e.clientY));
+    el.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') tipHide(); });
+    el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); tipShow(get(), r.left + r.width / 2, r.bottom); });
+    el.addEventListener('blur', tipHide);
+  }
+  // Breakdown of one column (a month, week or day) by category, biggest first
+  function stackTip(title, cats, total, hovered, lines) {
+    const rows = CATS.filter(c => cats[c.id] > 0).sort((a, b) => cats[b.id] - cats[a.id])
+      .map(c => ({ cat: c.id, label: c.name, value: fmt(cats[c.id]), pct: share(cats[c.id], total), on: c.id === hovered }));
+    return { value: fmt(total), title, rows, lines };
+  }
+  const ariaCats = cats => {
+    const p = CATS.filter(c => cats[c.id] > 0).sort((a, b) => cats[b.id] - cats[a.id]);
+    return p.length ? '. ' + p.map(c => c.name + ' ' + fmt(cats[c.id])).join(', ') : '. No expenses';
+  };
+  const topCat = cats => {
+    const c = CATS.filter(x => cats[x.id] > 0).sort((a, b) => cats[b.id] - cats[a.id])[0];
+    return c ? c.name : '–';
+  };
+
+  // ── Stacked column chart (months, weeks and days all use it) ──
+  const GAP = 2;   // surface gap between stacked segments
+  function topRounded(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h);
+    return `M${x},${y + h}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h}Z`;
+  }
+  function niceScale(max, n) {
+    if (!(max > 0)) max = 1;
+    const raw = max / n, mag = 10 ** Math.floor(Math.log10(raw));
+    const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= raw);
+    const top = Math.ceil(max / step - 1e-9) * step;
+    return { max: top, ticks: Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step) };
+  }
+  function emptyChart(box, msg = 'No expenses in this range.') { box.replaceChildren(make('p', 'chart-empty', msg)); }
+
+  // cols: [{ label, sub, cats, total, aria, tip(cat), selected, muted }]
+  // o: { height, yAxis, caps: 'auto' | 'all' | 'selected', avg, onPick(i, byKeyboard), label }
+  function columnChart(box, cols, o) {
+    box.replaceChildren();
+    const W = Math.max(260, Math.floor(box.clientWidth)), H = o.height;
+    const peak = Math.max(o.avg || 0, ...cols.map(c => c.total));
+    const sc = o.yAxis ? niceScale(peak, 4) : { max: peak || 1, ticks: [] };
+    const tickText = sc.ticks.map(fmtShort);
+    const hasSub = cols.some(c => c.sub);
+    const m = {
+      t: 22, r: o.avg ? 74 : 2, b: hasSub ? 38 : 24,
+      l: o.yAxis ? Math.ceil(Math.max(...tickText.map(s => s.length)) * 6.4) + 12 : 0,
+    };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const Y = v => m.t + ph - v / sc.max * ph;
+    const band = pw / cols.length;
+    const bw = Math.max(3, Math.min(24, band * .6));      // thin marks, never wider than 24px
+    const root = svg('svg', { class: 'chart-svg' + (o.onPick ? ' pickable' : ''), width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'group', 'aria-label': o.label }, box);
+
+    sc.ticks.forEach((t, i) => {
+      if (i) svg('line', { class: 'grid', x1: m.l, x2: m.l + pw, y1: Math.round(Y(t)) + .5, y2: Math.round(Y(t)) + .5 }, root);
+      svg('text', { class: 'tick', x: m.l - 10, y: Y(t) + 4, 'text-anchor': 'end' }, root).textContent = tickText[i];
+    });
+    cols.forEach((c, i) => {
+      if (c.selected) svg('rect', { class: 'sel-band', x: m.l + band * i + 1, y: 2, width: Math.max(0, band - 2), height: H - 4, rx: 8 }, root);
+    });
+
+    const bars = svg('g', { class: 'bars' }, root);
+    const caps = svg('g', { class: 'caps' }, root);
+    const xs = svg('g', { class: 'xs' }, root);
+    const capW = c => fmtShort(c.total).length * 6.6 + 8;
+    const fitsAll = cols.every(c => capW(c) < band);
+    const peakI = cols.reduce((k, c, i) => c.total > cols[k].total ? i : k, 0), lastI = cols.length - 1;
+    const capAt = new Set(o.caps === 'all' || (o.caps === 'auto' && fitsAll) ? cols.keys()
+      : o.caps === 'auto' ? (Math.abs(peakI - lastI) * band > capW(cols[peakI]) ? [peakI, lastI] : [peakI])
+      : cols.flatMap((c, i) => c.selected ? [i] : []));
+
+    const groups = cols.map((c, i) => {
+      const cx = m.l + band * i + band / 2, x = cx - bw / 2;
+      const g = svg('g', { class: 'col' + (c.muted ? ' muted' : '') + (c.selected ? ' selected' : ''), tabindex: -1, role: 'img', 'aria-label': c.aria }, bars);
+      svg('rect', { class: 'ring', x: cx - band / 2 + 2, y: m.t - 4, width: Math.max(0, band - 4), height: ph + 4, rx: 6 }, g);
+      const present = CATS.filter(k => c.cats[k.id] > 0);
+      let acc = 0;
+      present.forEach((k, j) => {
+        const v = c.cats[k.id], y1 = Y(acc + v), y0 = Y(acc), top = j === present.length - 1;
+        acc += v;
+        const h = y0 - y1 - (top ? 0 : GAP);
+        if (h < .5) return;
+        const attrs = { class: 'seg cat-' + k.id, 'data-cat': k.id };
+        if (top) svg('path', { ...attrs, d: topRounded(x, y1, bw, h, 4) }, g);
+        else svg('rect', { ...attrs, x, y: y1 + GAP, width: bw, height: h }, g);
+      });
+      if (capAt.has(i) && c.total > 0) svg('text', { class: 'cap', x: cx, y: Y(c.total) - 7, 'text-anchor': 'middle' }, caps).textContent = fmtShort(c.total);
+      if (c.label) svg('text', { class: 'xl' + (c.selected ? ' sel' : '') + (c.muted ? ' mute' : ''), x: cx, y: m.t + ph + 17, 'text-anchor': 'middle' }, xs).textContent = c.label;
+      if (c.sub) svg('text', { class: 'xl' + (c.muted ? ' mute' : ''), x: cx, y: m.t + ph + 31, 'text-anchor': 'middle' }, xs).textContent = c.sub;
+      return g;
+    });
+    svg('line', { class: 'baseline', x1: m.l, x2: m.l + pw, y1: Math.round(Y(0)) + .5, y2: Math.round(Y(0)) + .5 }, root);
+    if (o.avg) {
+      const layer = svg('g', { class: 'avg-layer' }, root), ya = Math.round(Y(o.avg)) + .5;
+      svg('line', { class: 'avg', x1: m.l, x2: m.l + pw + 4, y1: ya, y2: ya }, layer);
+      svg('text', { class: 'avg-label', x: m.l + pw + 9, y: ya + 4 }, layer).textContent = 'avg ' + fmtShort(o.avg);
+    }
+
+    // hover: the whole band is the hit area, and the segment under the pointer is emphasized
+    let cur = -1, curCat = null;
+    const setOn = (i, cat) => {
+      root.classList.toggle('hovering', i >= 0);
+      groups.forEach((g, k) => { g.classList.toggle('on', k === i); g.classList.toggle('has-seg', k === i && !!cat); });
+      if (i >= 0) groups[i].querySelectorAll('.seg').forEach(s => s.classList.toggle('on', s.dataset.cat === cat));
+      cur = i; curCat = cat;
+    };
+    const indexAt = e => {
+      const r = root.getBoundingClientRect(), i = Math.floor((e.clientX - r.left - m.l) / band);
+      return i >= 0 && i < cols.length ? i : -1;
+    };
+    root.addEventListener('pointermove', e => {
+      const i = indexAt(e);
+      if (i < 0) { if (cur >= 0) { setOn(-1, null); tipHide(); } return; }
+      const seg = e.target.closest('.seg'), cat = seg ? seg.dataset.cat : null;
+      if (i === cur && cat === curCat && !$('tip').hidden) return tipPlace(e.clientX, e.clientY);
+      setOn(i, cat);
+      tipShow(cols[i].tip(cat), e.clientX, e.clientY);
+    });
+    root.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') { setOn(-1, null); tipHide(); } });
+    if (o.onPick) root.addEventListener('click', e => { const i = indexAt(e); if (i >= 0) o.onPick(i, false); });
+
+    // keyboard: one tab stop for the chart, arrow keys move between columns
+    const sel = cols.findIndex(c => c.selected);
+    groups[sel >= 0 ? sel : lastI].setAttribute('tabindex', '0');
+    groups.forEach((g, i) => {
+      g.addEventListener('focus', () => {
+        setOn(i, null);
+        const r = g.getBoundingClientRect();
+        tipShow(cols[i].tip(null), r.left + r.width / 2, r.top + r.height / 3);
+      });
+      g.addEventListener('blur', () => { setOn(-1, null); tipHide(); });
+      g.addEventListener('keydown', e => {
+        const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: lastI }[e.key];
+        if (to !== undefined) {
+          e.preventDefault();
+          const j = clamp(to, 0, lastI);
+          groups.forEach((x, k) => x.setAttribute('tabindex', k === j ? '0' : '-1'));
+          groups[j].focus();
+        } else if ((e.key === 'Enter' || e.key === ' ') && o.onPick) {
+          e.preventDefault();
+          o.onPick(i, true);
+        }
+      });
+    });
+  }
+
+  // Collapsible table twin of a chart (keeps its open state across re-renders)
+  function putTable(id, cols, rows) {
+    const box = $(id), wasOpen = !!box.querySelector('details[open]');
+    const details = make('details', 'data');
+    details.open = wasOpen;
+    const table = make('table', 'data-table');
+    const head = table.createTHead().insertRow();
+    for (const c of cols) { const th = make('th', c.num ? 'num' : null, c.label); th.scope = 'col'; head.append(th); }
+    const body = table.createTBody();
+    for (const row of rows) {
+      const tr = body.insertRow();
+      row.forEach((v, i) => { const td = tr.insertCell(); td.textContent = v; if (cols[i].num) td.className = 'num'; });
+    }
+    const wrap = make('div', 'data-wrap');
+    wrap.append(table);
+    details.append(make('summary', null, 'Data table'), wrap);
+    box.replaceChildren(details);
+  }
+
+  function legend(el, cats) {
+    el.replaceChildren(...cats.map(c => { const s = make('span', 'cat-' + c.id); s.append(make('span', 'sw'), c.name); return s; }));
+  }
+  function segbar(el, byCat, total, tip) {
+    el.replaceChildren();
+    const parts = CATS.filter(c => byCat[c.id] && byCat[c.id].amt > 0);
+    for (const c of parts) {
+      const part = make('span', 'cat-' + c.id);
+      part.style.flexGrow = byCat[c.id].amt;
+      part.dataset.tip = '';
+      part.addEventListener('pointerenter', e => tipShow(tip(c.id), e.clientX, e.clientY));
+      part.addEventListener('pointermove', e => tipPlace(e.clientX, e.clientY));
+      part.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') tipHide(); });
+      el.append(part);
+    }
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', parts.length ? 'Split by category: ' + parts.map(c => c.name + ' ' + share(byCat[c.id].amt, total)).join(', ') : 'No expenses');
+  }
+  function setDelta(el, cur, prev, what) {
+    const p = (cur - prev) / prev * 100, r = Math.round(Math.abs(p));
+    const dir = r < 1 ? 'flat' : p > 0 ? 'up' : 'down';
+    el.className = 'delta ' + dir;
+    const arrow = make('span', 'delta-arrow', dir === 'up' ? '▲' : dir === 'down' ? '▼' : '●');
+    arrow.setAttribute('aria-hidden', 'true');
+    el.replaceChildren(arrow, dir === 'flat' ? 'About the same as ' + what : r + '% ' + (dir === 'up' ? 'more' : 'less') + ' than ' + what);
+  }
+  function catTip(id, v) {
+    const s = v.byCat[id] || { amt: 0, n: 0 };
+    const lines = [plural(s.n, 'expense') + (s.n ? ', ' + fmt(s.amt / s.n) + ' on average' : '')];
+    if (v.fullMonths.length) lines.push('About ' + fmt(sum(v.fullMonths, m => m.cats[id] || 0) / v.fullMonths.length) + ' a month');
+    const top = new Map();
+    for (const t of v.list) {
+      if (t.cat !== id) continue;
+      const k = normKey(t.desc) || t.desc, e = top.get(k) || { name: clip(t.desc, 22), amt: 0 };
+      e.amt += t.amt; top.set(k, e);
+    }
+    const best = [...top.values()].sort((a, b) => b.amt - a.amt).slice(0, 3);
+    if (best.length) lines.push('Top: ' + best.map(e => e.name + ' ' + fmtShort(e.amt)).join(', '));
+    return { value: fmt(s.amt), title: CAT[id].name + ' · ' + share(s.amt, v.total) + ' of spending', lines };
+  }
+
+  // ── Render ──────────────────────────────────────
+  let firstPaint = true;
+  function refresh() { V = computeView(); renderAll(); }
+  function renderAll() {
+    const empty = S.mine && !S.txs.length;
+    $('sample-banner').hidden = S.mine;
+    $('empty-state').hidden = !empty;
+    $('dash').hidden = empty;
+    renderData();
+    if (empty) return;
+    renderFilters(V);
+    renderSummary(V);
+    renderMonthly(V);
+    renderCategories(V);
+    renderWeek(V);
+    renderWeeks(V);
+    renderTable(V);
+  }
+
+  function renderFilters(v) {
+    for (const b of $('presets').children) b.setAttribute('aria-pressed', String(b.dataset.preset === S.preset));
+    $('from').value = isoOf(v.from);
+    $('to').value = isoOf(v.to);
+    for (const b of $('chips').children) b.setAttribute('aria-pressed', String(b.dataset.cat ? S.only.has(b.dataset.cat) : !S.only.size));
+  }
+
+  function renderSummary(v) {
+    const picked = CATS.filter(c => S.only.has(c.id)).map(c => c.name);
+    $('total-label').textContent = picked.length ? 'Spent on ' + (picked.length > 2 ? plural(picked.length, 'category', 'categories') : picked.join(' and ')) : 'Total spent';
+    $('total').textContent = fmt(v.total);
+    $('total-sub').textContent = span(v.from, v.to) + ' · ' + plural(v.list.length, 'expense');
+    const d = $('total-delta');
+    if (v.prevTotal) setDelta(d, v.total, v.prevTotal, span(v.pFrom, v.pTo));
+    else { d.className = 'delta flat'; d.textContent = S.preset === 'all' ? '' : 'No earlier data to compare with yet.'; }
+    segbar($('total-bar'), v.byCat, v.total, id => catTip(id, v));
+
+    const box = $('kpis');
+    box.replaceChildren();
+    const tile = (label, value, sub) => {
+      const t = make('div', 'kpi'), val = make('p', 'kpi-value');
+      if (typeof value === 'string') val.textContent = value; else val.append(...value);
+      t.append(make('p', 'card-label', label), val, make('p', 'kpi-sub', sub));
+      box.append(t);
+    };
+    // 1 · per month
+    const ym = ymOf(v.to), monthDays = ymEnd(ym) - ymStart(ym) + 1, elapsed = v.covTo - ymStart(ym) + 1;
+    if (v.fullMonths.length) tile('Monthly average', fmt(v.monthAvg), 'Across ' + plural(v.fullMonths.length, 'full month'));
+    else if (S.preset === 'month' && v.to === v.today && elapsed >= 3 && elapsed < monthDays) tile('On pace for', fmt(v.total / elapsed * monthDays), 'By the end of ' + fd('my', v.to) + ', at this rate');
+    else tile('Daily average', fmt(v.covDays ? v.total / v.covDays : 0), 'Over ' + plural(v.covDays, 'day'));
+    // 2 · per week
+    if (v.fullWeeks.length) tile('Weekly average', fmt(v.weekAvg), 'Across ' + plural(v.fullWeeks.length, 'full week'));
+    else tile('Weekly average', fmt(v.covDays ? v.total / v.covDays * 7 : 0), 'Estimated from ' + plural(v.covDays, 'day'));
+    // 3 · top category
+    const ranked = CATS.filter(c => v.byCat[c.id]).sort((a, b) => v.byCat[b.id].amt - v.byCat[a.id].amt);
+    if (ranked.length > 1) {
+      const c = ranked[0];
+      tile('Top category', [make('span', 'sw cat-' + c.id), make('span', 'kpi-text', c.name)], fmt(v.byCat[c.id].amt) + ' · ' + share(v.byCat[c.id].amt, v.total) + ' of spending');
+    } else tile('Average expense', fmt(v.list.length ? v.total / v.list.length : 0), plural(v.list.length, 'expense'));
+    // 4 · biggest expense
+    if (v.biggest) tile('Biggest expense', fmtExact(v.biggest.amt), clip(v.biggest.desc, 40) + ' · ' + fd(yearOf(v.biggest.dn) === yearOf(v.today) ? 'md' : 'mdy', v.biggest.dn));
+    else tile('Biggest expense', fmt(0), 'Nothing in this range');
+  }
+
+  function renderMonthly(v) {
+    const box = $('monthly-chart');
+    const present = CATS.filter(c => v.byCat[c.id]);
+    legend($('monthly-legend'), present);
+    if (!v.total) { $('monthly-sub').textContent = 'No expenses in this range.'; emptyChart(box); $('monthly-table').replaceChildren(); return; }
+    const peak = v.months.reduce((a, x) => x.total > a.total ? x : a);
+    $('monthly-sub').textContent = v.months.length > 1 ? 'Highest: ' + fd('my', peak.start) + ', ' + fmt(peak.total) + '.' : fd('my', peak.start) + '.';
+    const multiYear = yearOf(v.from) !== yearOf(v.to);
+    // narrow columns get one-letter months (J F M …); very narrow ones label only January
+    const band = (box.clientWidth - 64) / v.months.length;
+    const monthLabel = x => band >= 30 ? fd('m', x.start) : band >= 9 || x.ym % 12 === 0 ? fd('mn', x.start) : '';
+    // years go under January, and under the first month if the next January isn't right beside it
+    const firstJan = v.months.findIndex(x => x.ym % 12 === 0);
+    const yearAt = i => multiYear && (v.months[i].ym % 12 === 0 || (i === 0 && (firstJan < 0 || firstJan * band >= 40)));
+    const cols = v.months.map((x, i) => {
+      const a = Math.max(x.start, v.from, v.covFrom), z = Math.min(x.end, v.to, v.covTo);
+      const now = x.start <= v.today && x.end > v.today && v.to >= v.today;   // this month, still going
+      const lines = [plural(x.n, 'expense')];
+      if ((a > x.start || z < x.end) && a <= z) lines.push((now ? 'Month in progress: ' : 'Partial month: ') + span(a, z));
+      return {
+        label: monthLabel(x), sub: now ? 'so far' : yearAt(i) ? String(Math.floor(x.ym / 12)) : '',
+        cats: x.cats, total: x.total, aria: fd('my', x.start) + ': ' + fmt(x.total) + ariaCats(x.cats),
+        tip: cat => stackTip(fd('my', x.start), x.cats, x.total, cat, lines),
+      };
+    });
+    columnChart(box, cols, { height: innerWidth < 640 ? 230 : 280, yAxis: true, caps: 'auto', label: 'Spending by month, stacked by category' });
+    putTable('monthly-table', [{ label: 'Month' }, { label: 'Total', num: true }, ...present.map(c => ({ label: c.name, num: true }))],
+      v.months.map(x => [fd('my', x.start), fmt(x.total), ...present.map(c => x.cats[c.id] ? fmt(x.cats[c.id]) : '–')]));
+  }
+
+  function renderCategories(v) {
+    const box = $('cats');
+    box.replaceChildren();
+    const rows = CATS.filter(c => v.byCat[c.id]).sort((a, b) => v.byCat[b.id].amt - v.byCat[a.id].amt);
+    $('cats-sub').textContent = rows.length ? 'Share of ' + fmt(v.total) + ' across ' + plural(rows.length, 'category', 'categories') + '.' : 'No expenses in this range.';
+    const max = rows.length ? v.byCat[rows[0].id].amt : 1;
+    for (const c of rows) {
+      const s = v.byCat[c.id];
+      const row = make('div', 'cat-row cat-' + c.id);
+      const name = make('span', 'cat-name');
+      name.append(make('span', 'sw'), c.name);
+      const track = make('span', 'cat-track'), fill = make('span', 'cat-fill');
+      fill.style.width = s.amt / max * 100 + '%';
+      track.append(fill);
+      row.append(name, track, make('span', 'cat-amt', fmt(s.amt)), make('span', 'cat-share', share(s.amt, v.total)));
+      bindTip(row, () => catTip(c.id, v), c.name + ': ' + fmt(s.amt) + ', ' + share(s.amt, v.total) + ' of spending, ' + plural(s.n, 'expense'));
+      box.append(row);
+    }
+  }
+
+  function weekStats(v, w) {
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const dn = w + i;
+      return { dn, cats: {}, total: 0, n: 0, live: dn >= v.from && dn <= v.to && dn >= v.covFrom && dn <= v.covTo };
+    });
+    const byCat = Object.create(null);
+    let biggest = null;
+    for (const t of v.list) {
+      if (t.dn < w || t.dn > w + 6) continue;
+      const d = days[t.dn - w];
+      d.cats[t.cat] = (d.cats[t.cat] || 0) + t.amt; d.total += t.amt; d.n++;
+      const c = byCat[t.cat] || (byCat[t.cat] = { amt: 0, n: 0 });
+      c.amt += t.amt; c.n++;
+      if (!biggest || t.amt > biggest.amt) biggest = t;
+    }
+    const live = days.flatMap((d, i) => d.live ? [i] : []);
+    const a = live.length ? live[0] : 0, z = live.length ? live[live.length - 1] : 6;
+    const partial = a > 0 || z < 6;
+    // compare with the same days of the week before (all data, not just this range)
+    const prev = v.b && v.b[0] <= w - 7 + a ? sum(S.txs.filter(t => t.dn >= w - 7 + a && t.dn <= w - 7 + z && v.vis(t.cat))) : null;
+    return { days, byCat, biggest, a, z, partial, prev, total: sum(days, d => d.total), n: sum(days, d => d.n) };
+  }
+
+  function renderWeek(v) {
+    const w = v.week, ws = weekStats(v, w), thisWeek = weekOf(v.today);
+    $('week-title').textContent = w === thisWeek ? 'This week.' : w === thisWeek - 7 ? 'Last week.' : 'Week of ' + fd('md', w) + '.';
+    $('week-range').textContent = shortSpan(w, w + 6);
+    $('week-prev').disabled = w - 7 < v.weeks[0].w;
+    $('week-next').disabled = w + 7 > v.weeks[v.weeks.length - 1].w;
+    const total = $('week-total');
+    total.textContent = fmt(ws.total);
+    if (ws.partial && ws.z < 6 && w + ws.z === v.covTo && v.covTo >= v.today - 1) total.append(make('small', null, 'so far'));
+
+    const dEl = $('week-delta');
+    if (ws.prev) setDelta(dEl, ws.total, ws.prev, ws.partial ? 'the same days the week before' : 'the week before');
+    else { dEl.className = 'delta flat'; dEl.textContent = ws.prev === 0 ? 'Nothing spent the week before.' : ''; }
+    const avgEl = $('week-avg');
+    if (ws.partial) avgEl.textContent = 'Counting ' + fd('wdl', w + ws.a) + ' to ' + fd('wdl', w + ws.z) + ' of this week.';
+    else if (v.weekAvg) {
+      const diff = ws.total - v.weekAvg;
+      avgEl.textContent = Math.abs(diff) < v.weekAvg * .02 ? 'Right on your weekly average of ' + fmt(v.weekAvg) + '.'
+        : fmt(Math.abs(diff)) + (diff > 0 ? ' above' : ' below') + ' your weekly average of ' + fmt(v.weekAvg) + '.';
+    } else avgEl.textContent = '';
+
+    const cols = ws.days.map(d => ({
+      label: fd('wd', d.dn), sub: String(dateOf(d.dn)), cats: d.cats, total: d.total, muted: !d.live,
+      aria: fd('wmdl', d.dn) + ': ' + fmt(d.total) + ariaCats(d.cats),
+      tip: cat => stackTip(fd('wmdl', d.dn), d.cats, d.total, cat,
+        [d.live ? plural(d.n, 'expense') : d.dn > v.today ? 'Still to come' : 'Outside the selected dates']),
+    }));
+    columnChart($('day-chart'), cols, { height: 150, yAxis: false, caps: 'all', label: 'Spending by day, week of ' + fd('md', w) });
+
+    segbar($('week-bar'), ws.byCat, ws.total, id => ({
+      value: fmt(ws.byCat[id].amt), title: CAT[id].name + ' · ' + share(ws.byCat[id].amt, ws.total) + ' of this week',
+      lines: [plural(ws.byCat[id].n, 'expense')],
+    }));
+    const list = $('week-cats');
+    list.replaceChildren();
+    const ranked = CATS.filter(c => ws.byCat[c.id]).sort((a, b) => ws.byCat[b.id].amt - ws.byCat[a.id].amt);
+    for (const c of ranked.slice(0, 3)) {
+      const row = make('div', 'wk-row cat-' + c.id);
+      row.append(make('span', 'sw'), make('span', 'wk-name', c.name), make('span', 'wk-amt', fmt(ws.byCat[c.id].amt)), make('span', 'wk-share', share(ws.byCat[c.id].amt, ws.total)));
+      list.append(row);
+    }
+    if (ranked.length > 3) list.append(make('p', 'wk-more', '+ ' + plural(ranked.length - 3, 'more category', 'more categories')));
+    const busiest = ws.days.reduce((a, d) => d.total > a.total ? d : a);
+    $('week-foot').textContent = ws.biggest
+      ? 'Biggest: ' + clip(ws.biggest.desc, 40) + ', ' + fmtExact(ws.biggest.amt) + ' on ' + fd('wdl', ws.biggest.dn) + '. Busiest day: ' + fd('wdl', busiest.dn) + ', ' + fmt(busiest.total) + '.'
+      : 'No expenses this week.';
+    putTable('day-table', [{ label: 'Day' }, { label: 'Total', num: true }, { label: 'Expenses', num: true }, { label: 'Top category' }],
+      ws.days.map(d => [fd('wmd', d.dn), fmt(d.total), d.n, topCat(d.cats)]));
+  }
+
+  function renderWeeks(v) {
+    const box = $('weeks-chart');
+    legend($('weeks-legend'), CATS.filter(c => v.byCat[c.id]));
+    if (!v.total) { $('weeks-sub').textContent = 'No expenses in this range.'; emptyChart(box); $('weeks-table').replaceChildren(); return; }
+    // as many weeks as fit, ending with the latest, or starting at the picked week if it's earlier
+    const n = clamp(Math.floor((box.clientWidth - 120) / 26), 6, 26);
+    const sel = v.weeks.findIndex(x => x.w === v.week);
+    let start = Math.max(0, v.weeks.length - n);
+    if (sel >= 0 && sel < start) start = sel;
+    const shown = v.weeks.slice(start, start + n);
+    $('weeks-sub').textContent = (shown.length < v.weeks.length ? 'Showing ' + shown.length + ' of ' + plural(v.weeks.length, 'week') + '. ' : '')
+      + (v.weekAvg ? 'Average ' + fmt(v.weekAvg) + ' a week. ' : '') + 'Pick a week to see its summary.';
+    const cols = shown.map((x, i) => {
+      const ms = ymStart(ymOf(x.w + 6));
+      const lines = [plural(x.n, 'expense')];
+      const a = Math.max(x.w, v.from, v.covFrom), z = Math.min(x.w + 6, v.to, v.covTo);
+      if (x.w <= v.today && v.today < x.w + 6 && v.to >= v.today) lines.push('Week in progress');
+      else if (!v.fullWeeks.includes(x) && a <= z) lines.push('Partial week: ' + shortSpan(a, z));
+      return {
+        label: ms >= x.w ? fd('m', ms) : i === 0 ? fd('m', x.w) : '',
+        cats: x.cats, total: x.total, selected: x.w === v.week,
+        aria: 'Week of ' + fd('mdy', x.w) + ': ' + fmt(x.total) + ariaCats(x.cats),
+        tip: cat => stackTip(shortSpan(x.w, x.w + 6), x.cats, x.total, cat, lines),
+      };
+    });
+    columnChart(box, cols, {
+      height: innerWidth < 640 ? 200 : 230, yAxis: true, caps: 'selected', avg: v.weekAvg,
+      label: 'Spending by week, stacked by category', onPick: (i, byKey) => selectWeek(shown[i].w, byKey),
+    });
+    putTable('weeks-table', [{ label: 'Week' }, { label: 'Total', num: true }, { label: 'Expenses', num: true }, { label: 'Top category' }],
+      v.weeks.map(x => [span(x.w, x.w + 6), fmt(x.total), x.n, topCat(x.cats)]));
+  }
+
+  function selectWeek(w, focus) {
+    S.week = w;
+    V.week = w;
+    renderWeek(V);
+    renderWeeks(V);
+    if (focus) { const c = $('weeks-chart').querySelector('.col.selected'); if (c) c.focus(); }
+  }
+
+  function renderTable(v) {
+    const q = S.query.trim().toLowerCase();
+    const rows = (q ? v.list.filter(t => (t.desc + ' ' + CAT[t.cat].name).toLowerCase().includes(q) || String(t.amt).includes(q)) : v.list.slice())
+      .sort((a, b) => b.dn - a.dn || b.amt - a.amt);
+    $('tx-sub').textContent = (q ? plural(rows.length, 'match', 'matches') : plural(rows.length, 'expense')) + ' in this range.';
+    const dayTotal = new Map();
+    for (const t of rows) dayTotal.set(t.dn, (dayTotal.get(t.dn) || 0) + t.amt);
+    const ul = $('tx-list');
+    const active = document.activeElement && document.activeElement.closest ? document.activeElement.closest('.tx') : null;
+    const focusId = active ? active.dataset.id : null;
+    ul.replaceChildren();
+    let last = null;
+    for (const t of rows.slice(0, S.limit)) {
+      if (t.dn !== last) {
+        last = t.dn;
+        const h = make('li', 'tx-day');
+        h.append(make('span', null, dayName(t.dn, v.today)), make('span', null, fmt(dayTotal.get(t.dn))));
+        ul.append(h);
+      }
+      const li = make('li', 'tx cat-' + t.cat);
+      li.dataset.id = t.id;
+      const icon = make('span', 'tx-icon', CAT[t.cat].icon);
+      icon.setAttribute('aria-hidden', 'true');
+      const main = make('div', 'tx-main');
+      const pickCat = make('select', 'tx-cat');
+      pickCat.setAttribute('aria-label', 'Category for ' + (t.desc || 'this expense'));
+      for (const c of CATS) pickCat.append(new Option(c.name, c.id));
+      pickCat.value = t.cat;
+      main.append(make('span', 'tx-desc', t.desc || 'Expense'), pickCat);
+      const del = make('button', 'tx-del', '×');
+      del.type = 'button';
+      del.setAttribute('aria-label', 'Delete ' + (t.desc || 'expense') + ', ' + fmtExact(t.amt));
+      li.append(icon, main, make('span', 'tx-amt', fmtExact(t.amt)), del);
+      ul.append(li);
+    }
+    $('tx-empty').hidden = rows.length > 0;
+    const more = $('tx-more');
+    more.hidden = rows.length <= S.limit;
+    more.textContent = 'Show more (' + (rows.length - S.limit).toLocaleString(LOCALE) + ' left)';
+    if (focusId) { const s = ul.querySelector('.tx[data-id="' + CSS.escape(focusId) + '"] .tx-cat'); if (s) s.focus(); }
+  }
+
+  function renderData() {
+    const n = S.txs.length;
+    const never = 'This page can’t make network requests, so what you enter never leaves your device.';
+    $('data-status').textContent = S.mine
+      ? (n ? plural(n, 'expense') + ' saved in this browser, and only here. ' : 'Nothing saved yet. ') + never
+        + ' Export a CSV to keep a backup or to move to another browser.'
+        + (storageOk ? '' : ' Your browser is blocking storage, so changes will be lost when you close this page.')
+      : 'You’re looking at sample data, and nothing is saved until you add your own. ' + never;
+    $('btn-export').hidden = !S.mine || !n;
+    $('btn-clear').hidden = !S.mine;
+    $('currency').value = S.currency;
+  }
+
+  // ── Editing ─────────────────────────────────────
+  function startMine() {             // the first expense or import replaces the sample data
+    if (S.mine) return false;
+    S.mine = true;
+    S.txs = [];
+    S.rules = Object.create(null);
+    return true;
+  }
+  function recategorize(id, cat) {
+    const t = S.txs.find(x => x.id === id);
+    if (!t || t.cat === cat || !CAT[cat]) return;
+    snapshot();
+    // apply to every expense with the same description, and remember it for future imports
+    const key = normKey(t.desc);
+    let n = 0;
+    for (const x of S.txs) if (x === t || (key && normKey(x.desc) === key && x.cat !== cat)) { x.cat = cat; n++; }
+    if (key && S.mine) S.rules[key] = cat;
+    save();
+    refresh();
+    toast(n > 1 ? 'Moved ' + n + ' “' + clip(t.desc, 24) + '” expenses to ' + CAT[cat].name + '.' : 'Moved to ' + CAT[cat].name + '.', true);
+  }
+  function deleteTx(id) {
+    const t = S.txs.find(x => x.id === id);
+    if (!t) return;
+    snapshot();
+    S.txs = S.txs.filter(x => x !== t);
+    save();
+    refresh();
+    toast('Deleted “' + clip(t.desc || 'expense', 28) + '”, ' + fmtExact(t.amt) + '.', true);
+  }
+
+  let toastTimer = 0;
+  function toast(msg, canUndo) {
+    const el = $('toast');
+    el.replaceChildren(make('span', null, msg));
+    if (canUndo) {
+      const b = make('button', 'toast-btn', 'Undo');
+      b.type = 'button';
+      b.addEventListener('click', () => { undo(); hideToast(); });
+      el.append(b);
+    }
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 7000);
+  }
+  function hideToast() {
+    const el = $('toast');
+    el.classList.remove('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.replaceChildren(), 300);
+  }
+
+  // ── Add an expense ──────────────────────────────
+  function openAdd() {
+    $('add-form').reset();
+    $('add-date').value = isoOf(todayDn());
+    $('add-status').textContent = '';
+    syncAutoOption();
+    $('add-dialog').showModal();
+    $('add-amt').focus();
+  }
+  function syncAutoOption() {
+    const d = $('add-desc').value.trim();
+    $('add-cat').options[0].text = d ? 'Auto: ' + CAT[categorize(d)].name : 'Detect from description';
+  }
+  function submitAdd(e) {
+    e.preventDefault();
+    const amt = Math.abs(parseAmount($('add-amt').value)), desc = $('add-desc').value.trim(), date = $('add-date').value;
+    const fail = (msg, field) => { $('add-status').textContent = msg; $(field).focus(); };
+    if (!(amt > 0)) return fail('Enter an amount above zero.', 'add-amt');
+    if (!desc) return fail('Add a few words about what it was.', 'add-desc');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail('Pick a date.', 'add-date');
+    snapshot();
+    const fresh = startMine();
+    const picked = $('add-cat').value;
+    const auto = categorize(desc);
+    const cat = picked === 'auto' ? auto : picked;
+    if (picked !== 'auto' && picked !== auto && normKey(desc)) S.rules[normKey(desc)] = picked;
+    const t = { id: uid(), d: date, dn: dnOf(date), desc: desc.slice(0, 200), amt: Math.round(amt * 100) / 100, cat };
+    S.txs.push(t);
+    if (fresh) { S.preset = 'all'; S.week = null; savePrefs(); }   // a new tracker: show everything you have
+    save();
+    $('add-dialog').close();
+    refresh();
+    const outside = t.dn < V.from || t.dn > V.to ? ' It’s outside the dates you’re viewing.' : '';
+    toast('Added ' + fmtExact(t.amt) + ' to ' + CAT[cat].name + '.' + (fresh ? ' Sample data cleared.' : '') + outside, true);
+  }
+
+  // ── Import a CSV ────────────────────────────────
+  function parseCSV(text) {
+    text = String(text).replace(/^﻿/, '');
+    const first = (text.split(/\r?\n/).find(l => l.trim()) || '');
+    const count = d => first.split(d).length - 1;
+    const delim = first.includes('\t') ? '\t' : [',', ';', '|'].reduce((a, d) => count(d) > count(a) ? d : a, ',');
+    const rows = [];
+    let row = [], f = '', q = false;
+    for (let i = 0; i < text.length && rows.length < 50000; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+        else f += ch;
+      } else if (ch === '"' && !f.trim()) { q = true; f = ''; }
+      else if (ch === delim) { row.push(f.trim()); f = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(f.trim());
+        if (row.some(Boolean)) rows.push(row);
+        row = []; f = '';
+      } else f += ch;
+    }
+    row.push(f.trim());
+    if (row.some(Boolean)) rows.push(row);
+    return rows;
+  }
+  // "₱1,234.50", "(1,234.50)", "-1234.5", "1.234,50", "1,234.00 DR" → number (NaN if none)
+  function parseAmount(s) {
+    s = String(s ?? '').trim();
+    if (!/\d/.test(s)) return NaN;
+    const core = s.replace(/[^\d.,()\-−]/g, '');
+    let neg = /^[-−]|[-−]$/.test(core) || /^\(.*\)$/.test(core) || /\bdr\b/i.test(s);
+    if (/\bcr\b/i.test(s)) neg = false;
+    let num = core.replace(/[()\-−]/g, '');
+    const dots = (num.match(/\./g) || []).length, commas = (num.match(/,/g) || []).length;
+    if (dots > 1 && !commas) num = num.replace(/\./g, '');
+    else if (commas && dots) num = num.lastIndexOf(',') > num.lastIndexOf('.') ? num.replace(/\./g, '').replace(',', '.') : num.replace(/,/g, '');
+    else if (commas === 1 && /,\d{1,2}$/.test(num)) num = num.replace(',', '.');
+    else num = num.replace(/,/g, '');
+    const v = parseFloat(num);
+    return Number.isFinite(v) ? (neg ? -v : v) : NaN;
+  }
+  const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  function mkDn(y, m, d) {
+    if (y < 100) y += 2000;
+    if (y < 1990 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dn = Date.UTC(y, m - 1, d) / DAY;
+    return ymOf(dn) === y * 12 + m - 1 ? dn : null;      // rejects Feb 30
+  }
+  // ISO, 11/03/2026 (order = 'mdy' or 'dmy'), 3 Nov 2026, Nov 3, 2026, or a spreadsheet serial
+  function parseDate(s, order = 'mdy') {
+    s = String(s ?? '').trim().replace(/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+/i, '');
+    let m;
+    if ((m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s))) return mkDn(+m[1], +m[2], +m[3]);
+    if ((m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})(?!\d)/.exec(s))) return order === 'dmy' ? mkDn(+m[3], +m[2], +m[1]) : mkDn(+m[3], +m[1], +m[2]);
+    if ((m = /^(\d{1,2})[\s-]+([a-z]{3})[a-z]*\.?,?[\s-]+(\d{2,4})(?!\d)/i.exec(s))) {
+      const i = MONTH_NAMES.indexOf(m[2].toLowerCase());
+      return i < 0 ? null : mkDn(+m[3], i + 1, +m[1]);
+    }
+    if ((m = /^([a-z]{3})[a-z]*\.?[\s-]+(\d{1,2})(?:st|nd|rd|th)?,?[\s-]+(\d{2,4})(?!\d)/i.exec(s))) {
+      const i = MONTH_NAMES.indexOf(m[1].toLowerCase());
+      return i < 0 ? null : mkDn(+m[3], i + 1, +m[2]);
+    }
+    if ((m = /^(\d{5})(\.\d+)?$/.exec(s)) && +m[1] > 32000 && +m[1] < 75000) return +m[1] - 25569;
+    return null;
+  }
+  function detectDateOrder(values) {
+    let firstBig = false, secondBig = false;
+    for (const v of values) {
+      const m = /^\s*(\d{1,2})[-/.](\d{1,2})[-/.]\d{2,4}/.exec(v || '');
+      if (!m) continue;
+      if (+m[1] > 12) firstBig = true;
+      if (+m[2] > 12) secondBig = true;
+    }
+    return firstBig && !secondBig ? 'dmy' : 'mdy';
+  }
+  const isHeaderRow = r => !r.some(c => /\d/.test(c) && (parseDate(c) != null || Number.isFinite(parseAmount(c))));
+  const CREDIT_TYPE = /^(credit|cr|income|deposit|inflow|money in|refund)$/i;
+  const ANY_TYPE = /^(debit|dr|expense|withdrawal|outflow|money out|purchase|payment|credit|cr|income|deposit|inflow|money in|refund)$/i;
+
+  function guessColumns(names, data, named) {
+    const rows = data.slice(0, 300);
+    const stats = names.map((name, i) => {
+      const vals = rows.map(r => (r[i] || '').trim()).filter(Boolean), n = vals.length || 1;
+      return {
+        i, name: named ? name : '',
+        date: vals.filter(v => parseDate(v) != null).length / n,
+        num: vals.filter(v => !/[a-z]{3,}/i.test(v.replace(/\b(php|usd|dr|cr)\b/ig, '')) && Number.isFinite(parseAmount(v))).length / n,
+        len: vals.reduce((s, v) => s + v.length, 0) / n,
+        filled: vals.length / (rows.length || 1),
+        type: vals.length && vals.filter(v => ANY_TYPE.test(v)).length / vals.length > .8,
+      };
+    });
+    const used = new Set();
+    const take = s => { if (!s) return -1; used.add(s.i); return s.i; };
+    const byName = (re, not) => stats.find(s => !used.has(s.i) && re.test(s.name) && !(not && not.test(s.name)));
+    const best = (score, min) => stats.filter(s => !used.has(s.i) && score(s) >= min).sort((a, b) => score(b) - score(a))[0];
+    const date = take(byName(/date|posted|\btime\b|\bwhen\b|\bday\b/i) || best(s => s.date, .6));
+    const amt = take(byName(/amount|\bamt\b|spent|price|cost|\btotal\b|\bvalue\b|\bphp\b|₱/i, /balance|date/i)
+      || byName(/debit|withdraw|money\s*out|paid\s*out|outflow|\bexpense/i, /balance/i) || best(s => s.num, .6));
+    const type = stats.find(s => !used.has(s.i) && s.type);
+    if (type) used.add(type.i);
+    const cat = take(byName(/categ|\btag|\bgroup\b|\bclass/i));
+    const desc = take(byName(/desc|merchant|payee|detail|narrat|memo|particular|\bname\b|\bitem|\bnote|remark|transaction|reference|\bstore\b|\bwhat\b/i, /date|\bno\.?$|number|\bid\b|\btype\b|code/i)
+      || best(s => (1 - s.num) * (1 - s.date) * s.len * s.filled, 1));
+    return { date, amt, cat, desc, type: type ? type.i : -1 };
+  }
+
+  let IMP = null;
+  function resetImport() {
+    IMP = null;
+    $('import-file').value = '';
+    $('import-text').value = '';
+    $('paste').open = false;
+    $('import-map').hidden = true;
+    $('import-result').hidden = true;
+    $('import-go').disabled = true;
+    $('import-go').textContent = 'Import';
+    $('import-status').textContent = '';
+    $('replace-wrap').hidden = !S.mine || !S.txs.length;
+    $('import-replace').checked = false;
+  }
+  function openImport() { resetImport(); $('import-dialog').showModal(); }
+  async function readImportFile(file) {
+    if (file.size > 5e6) { $('import-status').textContent = 'That file is over 5 MB. Try exporting a shorter date range.'; return; }
+    try { loadImport(await file.text(), file.name); }
+    catch { $('import-status').textContent = 'Couldn’t read that file.'; }
+  }
+  function fillSelect(sel, names, value, optional) {
+    sel.replaceChildren();
+    if (optional) sel.append(new Option('None (auto-detect)', ''));
+    names.forEach((n, i) => sel.append(new Option(n, String(i))));
+    sel.value = value >= 0 ? String(value) : optional ? '' : '0';
+  }
+  function loadImport(text, source) {
+    const rows = parseCSV(text);
+    $('import-status').textContent = '';
+    if (!rows.length) {
+      IMP = null;
+      $('import-map').hidden = $('import-result').hidden = true;
+      $('import-go').disabled = true;
+      if (text.trim()) $('import-status').textContent = 'Couldn’t find any rows in ' + source + '.';
+      return;
+    }
+    const header = isHeaderRow(rows[0]) ? rows[0] : null;
+    const data = header ? rows.slice(1) : rows;
+    const width = Math.max(...rows.slice(0, 200).map(r => r.length));
+    const names = Array.from({ length: width }, (_, i) =>
+      header && header[i] ? header[i] : 'Column ' + (i + 1) + (data[0] && data[0][i] ? ' (' + clip(data[0][i], 18) + ')' : ''));
+    const g = guessColumns(names, data, !!header);
+    IMP = { data, typeCol: g.type };
+    fillSelect($('map-date'), names, g.date, false);
+    fillSelect($('map-desc'), names, g.desc, false);
+    fillSelect($('map-amt'), names, g.amt, false);
+    fillSelect($('map-cat'), names, g.cat, true);
+    $('map-fmt').value = 'auto';
+    $('map-sign').value = 'auto';
+    $('import-map').hidden = false;
+    previewImport();
+  }
+  function buildImport() {
+    const di = +$('map-date').value, xi = +$('map-desc').value, ai = +$('map-amt').value;
+    const ci = $('map-cat').value === '' ? -1 : +$('map-cat').value;
+    const order = $('map-fmt').value === 'auto' ? detectDateOrder(IMP.data.map(r => r[di])) : $('map-fmt').value;
+    const amts = IMP.data.map(r => parseAmount(r[ai]));
+    let sign = $('map-sign').value;
+    const byType = sign === 'auto' && IMP.typeCol >= 0;
+    if (sign === 'auto') {
+      // Mixed signs: whichever sign most rows have is spending (bank exports: negative; card statements: positive).
+      const neg = amts.filter(a => a < 0).length, pos = amts.filter(a => a > 0).length;
+      sign = neg && pos ? (neg >= pos ? 'neg' : 'pos') : 'all';
+    }
+    const recs = [], skipped = { income: 0, bad: 0 };
+    IMP.data.forEach((r, i) => {
+      const dn = parseDate(r[di], order), a = amts[i];
+      if (dn == null || !Number.isFinite(a) || a === 0) {
+        if (dn != null && !String(r[ai] ?? '').trim()) skipped.income++; else skipped.bad++;
+        return;
+      }
+      if ((sign === 'neg' && a > 0) || (sign === 'pos' && a < 0) || (byType && CREDIT_TYPE.test(String(r[IMP.typeCol] || '').trim()))) { skipped.income++; return; }
+      const desc = String(r[xi] ?? '').trim().slice(0, 200) || 'Expense';
+      const cat = (ci >= 0 && mapCategory(r[ci])) || categorize(desc);
+      recs.push({ id: uid(), d: isoOf(dn), dn, desc, amt: Math.round(Math.abs(a) * 100) / 100, cat });
+    });
+    return { recs, skipped, sign };
+  }
+  function previewImport() {
+    if (!IMP) return;
+    const r = buildImport();
+    let lo = Infinity, hi = -Infinity;
+    for (const t of r.recs) { if (t.dn < lo) lo = t.dn; if (t.dn > hi) hi = t.dn; }
+    const parts = [r.recs.length ? plural(r.recs.length, 'expense') + ' ready, ' + span(lo, hi) + '.' : 'No expenses found yet. Check the columns above.'];
+    if (r.skipped.income) parts.push(plural(r.skipped.income, 'row') + ' skipped as income, payments or refunds' + (r.sign === 'neg' ? ' (positive amounts).' : r.sign === 'pos' ? ' (negative amounts).' : '.'));
+    if (r.skipped.bad) parts.push(plural(r.skipped.bad, 'row') + ' skipped without a readable date or amount.');
+    $('import-summary').textContent = parts.join(' ');
+    const counts = Object.create(null);
+    for (const t of r.recs) counts[t.cat] = (counts[t.cat] || 0) + 1;
+    $('import-cats').replaceChildren(...CATS.filter(c => counts[c.id]).map(c => {
+      const s = make('span', 'cat-' + c.id);
+      s.append(make('span', 'sw'), c.name, make('b', null, String(counts[c.id])));
+      return s;
+    }));
+    const box = $('import-preview');
+    box.replaceChildren();
+    if (r.recs.length) {
+      const table = make('table', 'data-table');
+      const head = table.createTHead().insertRow();
+      for (const [label, num] of [['Date'], ['Description'], ['Category'], ['Amount', true]]) { const th = make('th', num ? 'num' : null, label); th.scope = 'col'; head.append(th); }
+      const body = table.createTBody();
+      for (const t of r.recs.slice(0, 5)) {
+        const tr = body.insertRow();
+        [fd('mdy', t.dn), clip(t.desc, 32), CAT[t.cat].name, fmtExact(t.amt)].forEach((v, i) => { const td = tr.insertCell(); td.textContent = v; if (i === 3) td.className = 'num'; });
+      }
+      box.append(table);
+    }
+    $('import-result').hidden = false;
+    $('import-go').disabled = !r.recs.length;
+    $('import-go').textContent = r.recs.length ? 'Import ' + plural(r.recs.length, 'expense') : 'Import';
+  }
+  const dupKey = t => t.d + '|' + t.amt.toFixed(2) + '|' + normKey(t.desc);
+  function submitImport(e) {
+    e.preventDefault();
+    if (!IMP) return;
+    const recs = buildImport().recs;
+    if (!recs.length) return;
+    snapshot();
+    const fresh = startMine();
+    const base = fresh || $('import-replace').checked ? [] : S.txs;
+    // skip rows that are already here (re-importing an overlapping statement), but keep real repeats
+    const have = new Map();
+    for (const t of base) { const k = dupKey(t); have.set(k, (have.get(k) || 0) + 1); }
+    let dup = 0;
+    const added = [];
+    for (const t of recs) {
+      const k = dupKey(t), c = have.get(k);
+      if (c) { have.set(k, c - 1); dup++; } else added.push(t);
+    }
+    $('import-dialog').close();
+    if (!added.length) { undoState = null; toast('Nothing new to add: all ' + plural(dup, 'expense') + ' in that file are already here.'); return; }
+    S.txs = base.concat(added);
+    save();
+    V = computeView();
+    if (fresh || !added.some(t => t.dn >= V.from && t.dn <= V.to)) { S.preset = 'all'; savePrefs(); }
+    S.week = null;
+    refresh();
+    toast('Imported ' + plural(added.length, 'expense') + (dup ? ', skipped ' + plural(dup, 'duplicate') : '') + '.' + (fresh ? ' Sample data cleared.' : ''), true);
+  }
+
+  // ── Export ──────────────────────────────────────
+  function exportCSV() {
+    const esc = s => /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    const lines = ['Date,Description,Category,Amount', ...S.txs.slice().sort((a, b) => a.dn - b.dn || a.desc.localeCompare(b.desc))
+      .map(t => [t.d, esc(t.desc), CAT[t.cat].name, t.amt.toFixed(2)].join(','))];
+    const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' }));
+    const a = make('a');
+    a.href = url;
+    a.download = 'spending-' + isoOf(todayDn()) + '.csv';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  // ── Wiring ──────────────────────────────────────
+  function init() {
+    load();
+    setCurrency(S.currency);
+
+    const presets = $('presets');
+    for (const p of PRESETS) {
+      const b = make('button', null, p.label);
+      b.type = 'button';
+      b.dataset.preset = p.id;
+      b.title = p.title;
+      b.setAttribute('aria-label', p.title);
+      presets.append(b);
+    }
+    presets.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      S.preset = b.dataset.preset; S.week = null; S.limit = 30;
+      savePrefs(); refresh();
+    });
+    for (const id of ['from', 'to']) {
+      $(id).addEventListener('change', () => {
+        const a = $('from').value, z = $('to').value;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(z)) return;
+        S.preset = 'custom'; S.from = dnOf(a); S.to = dnOf(z); S.week = null; S.limit = 30;
+        savePrefs(); refresh();
+      });
+    }
+
+    // category chips: the legend for every chart, and the category filter
+    const chips = $('chips');
+    const all = make('button', 'chip chip-all', 'All');
+    all.type = 'button';
+    chips.append(all);
+    for (const c of CATS) {
+      const b = make('button', 'chip cat-' + c.id);
+      b.type = 'button';
+      b.dataset.cat = c.id;
+      b.title = c.hint;
+      b.append(make('span', 'sw'), c.name);
+      chips.append(b);
+    }
+    chips.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const id = b.dataset.cat;
+      if (!id) S.only.clear();
+      else {
+        if (S.only.has(id)) S.only.delete(id); else S.only.add(id);
+        if (S.only.size === CATS.length) S.only.clear();
+      }
+      S.limit = 30;
+      savePrefs(); refresh();
+    });
+
+    $('week-prev').addEventListener('click', () => selectWeek(V.week - 7));
+    $('week-next').addEventListener('click', () => selectWeek(V.week + 7));
+
+    let searchTimer = 0;
+    $('tx-search').addEventListener('input', e => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { S.query = e.target.value; S.limit = 30; renderTable(V); }, 120);
+    });
+    $('tx-more').addEventListener('click', () => { S.limit += 60; renderTable(V); });
+    $('tx-list').addEventListener('change', e => {
+      const s = e.target.closest('.tx-cat');
+      if (s) recategorize(s.closest('.tx').dataset.id, s.value);
+    });
+    $('tx-list').addEventListener('click', e => {
+      const b = e.target.closest('.tx-del');
+      if (b) deleteTx(b.closest('.tx').dataset.id);
+    });
+
+    // buttons that open things, anywhere on the page
+    document.addEventListener('click', e => {
+      const a = e.target.closest('[data-action]');
+      if (a) {
+        if (a.dataset.action === 'add') openAdd();
+        else if (a.dataset.action === 'import') openImport();
+        else if (a.dataset.action === 'sample') { S.mine = false; S.txs = makeSample(todayDn()); S.week = null; save(); refresh(); }
+      }
+      const c = e.target.closest('[data-close]');
+      if (c) c.closest('dialog').close();
+    });
+    for (const d of document.querySelectorAll('dialog')) {
+      let downOnBackdrop = false;
+      d.addEventListener('pointerdown', e => { downOnBackdrop = e.target === d; });
+      d.addEventListener('click', e => { if (e.target === d && downOnBackdrop) d.close(); });
+    }
+    document.addEventListener('pointerdown', e => {
+      if (!(e.target.closest && e.target.closest('[data-tip], .chart-svg'))) tipHide();
+    });
+    window.addEventListener('scroll', tipHide, { passive: true });
+
+    // add dialog
+    const addCat = $('add-cat');
+    addCat.append(new Option('Detect from description', 'auto'));
+    for (const c of CATS) addCat.append(new Option(c.icon + ' ' + c.name, c.id));
+    $('add-desc').addEventListener('input', syncAutoOption);
+    $('add-form').addEventListener('submit', submitAdd);
+
+    // import dialog
+    $('import-file').addEventListener('change', e => { const f = e.target.files[0]; if (f) readImportFile(f); });
+    const drop = $('drop');
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault();
+      drop.classList.remove('over');
+      const f = e.dataTransfer && e.dataTransfer.files[0];
+      if (f) readImportFile(f);
+    });
+    let pasteTimer = 0;
+    $('import-text').addEventListener('input', e => {
+      clearTimeout(pasteTimer);
+      pasteTimer = setTimeout(() => loadImport(e.target.value, 'the pasted text'), 250);
+    });
+    for (const id of ['map-date', 'map-desc', 'map-amt', 'map-cat', 'map-fmt', 'map-sign']) $(id).addEventListener('change', previewImport);
+    $('import-form').addEventListener('submit', submitImport);
+
+    // your data
+    const cur = $('currency');
+    for (const c of CURRENCIES) cur.append(new Option(c + ' ' + symbolOf(c), c));
+    cur.addEventListener('change', () => { S.currency = cur.value; setCurrency(S.currency); save(); refresh(); });
+    $('btn-export').addEventListener('click', exportCSV);
+    let armed = 0;
+    $('btn-clear').addEventListener('click', () => {
+      const b = $('btn-clear');
+      if (Date.now() - armed > 4000) {
+        armed = Date.now();
+        b.textContent = 'Click again to delete everything';
+        setTimeout(() => { if (Date.now() - armed >= 4000) b.textContent = 'Delete all data'; }, 4100);
+        return;
+      }
+      armed = 0;
+      b.textContent = 'Delete all data';
+      snapshot();
+      S.mine = false; S.txs = makeSample(todayDn()); S.rules = Object.create(null); S.week = null;
+      save(); refresh();
+      toast('Deleted all your expenses. Showing sample data again.', true);
+    });
+
+    document.body.classList.add('anim');
+    refresh();
+    setTimeout(() => document.body.classList.remove('anim'), 1600);
+
+    // redraw the charts when the layout width changes
+    const main = $('main');
+    let lastW = main.clientWidth, frame = 0;
+    new ResizeObserver(() => {
+      if (main.clientWidth === lastW) return;
+      lastW = main.clientWidth;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { if (V && !$('dash').hidden) { renderMonthly(V); renderWeek(V); renderWeeks(V); } });
+    }).observe(main);
+  }
+
+  init();
+</script>
+</body>
+</html>
