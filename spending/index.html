@@ -6,7 +6,7 @@
   <!-- Content Security Policy: script-src pins the inline script by its SHA-256 hash. After any edit to the
        script, update the hash or the page stops working (see CLAUDE.md). There is no connect-src, so the page
        can't send anything you enter over the network. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wnNihI9xQ1yR5Rgk941PhLkBEMr/VPP4NbJDKJUpx5o='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sitapMIRXt/qsCPVU1QwHQ3eKvNR2M9tO6C/9P6+Te4='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'" />
   <meta name="referrer" content="no-referrer" />
   <meta name="robots" content="noindex" />
   <meta name="theme-color" content="#000000" />
@@ -115,6 +115,35 @@
     .brand svg { width: 24px; height: 24px; flex: none; }
     .nav-actions { display: flex; gap: .5rem; }
     .nav-actions .btn { gap: 0; }
+    .nav-lock { width: 33px; height: 33px; }
+    .nav-lock svg { width: 14px; height: 14px; }
+
+    /* ── Lock screen (shown until the passcode unlocks this browser's data) ── */
+    .lock { display: flex; justify-content: center; padding: 5rem 0 3rem; }
+    .lock-card { width: min(100%, 26rem); display: flex; flex-direction: column; align-items: center; gap: .85rem; text-align: center; }
+    .lock-icon { width: 64px; height: 64px; margin-bottom: .4rem; }
+    .lock-title { font-size: clamp(2.25rem, 5vw, 2.75rem); font-weight: 700; letter-spacing: -.022em; line-height: 1.08; }
+    .lock-text { color: var(--muted); font-size: 1.0625rem; letter-spacing: -.01em; line-height: 1.5; }
+    .lock-note { color: var(--text2); font-size: .9375rem; }
+    .lock-note:empty { display: none; }
+    .lock-form { width: 100%; display: flex; flex-direction: column; gap: .8rem; margin-top: .6rem; text-align: left; }
+    .lock-go { width: 100%; margin-top: .2rem; }
+    .link-btn { border: 0; background: none; color: var(--accent); font-size: .9375rem; padding: .3rem .5rem; border-radius: 6px; cursor: pointer; }
+    .link-btn:hover { text-decoration: underline; }
+    .lock-erase {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .8rem;
+      padding: 1rem 1.1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(255,69,58,.25);
+      background: rgba(255,69,58,.08);
+      color: var(--text2);
+      font-size: .875rem;
+      line-height: 1.5;
+    }
 
     /* ── Buttons ── */
     .btn {
@@ -720,17 +749,48 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="brand-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2997ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient></defs><rect width="24" height="24" rx="6" fill="url(#brand-g)"/><g fill="#fff"><rect x="5.25" y="12" width="3.25" height="6.75" rx="1"/><rect x="10.4" y="8.5" width="3.25" height="10.25" rx="1"/><rect x="15.5" y="5.25" width="3.25" height="13.5" rx="1"/></g></svg>
       Spending
     </a>
-    <div class="nav-actions">
+    <div class="nav-actions" id="nav-actions" hidden>
       <button class="btn btn-ghost btn-sm" type="button" data-action="import">Import</button>
       <button class="btn btn-primary btn-sm" type="button" data-action="add">Add<span class="hide-xs">&nbsp;expense</span></button>
+      <button class="icon-btn nav-lock" type="button" id="btn-lock" aria-label="Lock" title="Lock">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 7.2V5a3 3 0 0 1 6 0v2.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="7" width="10" height="7.5" rx="2" fill="currentColor"/></svg>
+      </button>
     </div>
   </div>
 </nav>
 
 <main class="shell" id="main">
+  <section class="lock" id="lock" aria-labelledby="lock-title">
+    <div class="lock-card">
+      <svg class="lock-icon" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lock-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2997ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient></defs><rect width="64" height="64" rx="15" fill="url(#lock-g)"/><path d="M24.5 29.5v-5.5a7.5 7.5 0 0 1 15 0v5.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><rect x="19" y="29" width="26" height="20" rx="4.5" fill="#fff"/><circle cx="32" cy="38.5" r="2.6" fill="#7a6ff4"/></svg>
+      <h1 class="lock-title" id="lock-title">Private.</h1>
+      <p class="lock-text" id="lock-text">This spending tracker only opens on its owner’s devices, with a passcode. Expenses are encrypted and never leave the browser they were entered in.</p>
+      <p class="lock-note" id="lock-note"></p>
+      <form class="lock-form" id="lock-form" novalidate hidden>
+        <div class="field">
+          <label for="lock-pass" id="lock-pass-label">Passcode</label>
+          <input id="lock-pass" type="password" autocomplete="current-password" />
+        </div>
+        <div class="field" id="lock-confirm-field" hidden>
+          <label for="lock-confirm">Confirm passcode</label>
+          <input id="lock-confirm" type="password" autocomplete="new-password" />
+        </div>
+        <p class="form-status err" id="lock-status" role="alert"></p>
+        <button class="btn btn-primary lock-go" type="submit" id="lock-go">Unlock</button>
+      </form>
+      <button class="link-btn" type="button" id="lock-setup">Set up on this device</button>
+      <button class="link-btn" type="button" id="lock-forgot" hidden>Forgot your passcode?</button>
+      <div class="lock-erase" id="lock-erase" hidden>
+        <p>A passcode can’t be recovered, because it isn’t stored anywhere. You can erase the tracker in this browser and start again, but the expenses saved here will be deleted.</p>
+        <button class="btn btn-ghost btn-sm btn-danger" type="button" id="lock-erase-go">Erase and start over</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="app" hidden>
   <header class="page-head">
     <p class="section-label">Money</p>
-    <h1>Where your money went.</h1>
+    <h1 id="app-title" tabindex="-1">Where your money went.</h1>
     <p class="page-sub">Monthly and weekly spending by category. It's all worked out in your browser, and nothing you enter leaves it.</p>
   </header>
 
@@ -864,9 +924,11 @@
       <label class="inline-field">Currency <select class="pill-select" id="currency"></select></label>
       <button class="btn btn-ghost btn-sm" type="button" data-action="import">Import CSV</button>
       <button class="btn btn-ghost btn-sm" type="button" id="btn-export">Export CSV</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="btn-pass">Change passcode</button>
       <button class="btn btn-ghost btn-sm btn-danger" type="button" id="btn-clear">Delete all data</button>
     </div>
   </section>
+  </div>
 </main>
 
 <footer class="shell">
@@ -955,6 +1017,33 @@
     <div class="dlg-foot">
       <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
       <button class="btn btn-primary btn-sm" type="submit" id="import-go" disabled>Import</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ██ CHANGE PASSCODE ██ -->
+<dialog id="pass-dialog" aria-labelledby="pass-title">
+  <form class="dlg" id="pass-form" novalidate>
+    <div class="dlg-head">
+      <h2 id="pass-title">Change passcode</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <label for="pass-old">Current passcode</label>
+      <input id="pass-old" type="password" autocomplete="current-password" />
+    </div>
+    <div class="field">
+      <label for="pass-new">New passcode</label>
+      <input id="pass-new" type="password" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label for="pass-confirm">Confirm new passcode</label>
+      <input id="pass-confirm" type="password" autocomplete="new-password" />
+    </div>
+    <p class="form-status err" id="pass-status" role="alert"></p>
+    <div class="dlg-foot">
+      <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+      <button class="btn btn-primary btn-sm" type="submit" id="pass-go">Change passcode</button>
     </div>
   </form>
 </dialog>
@@ -1127,12 +1216,51 @@
     return null;
   }
 
-  // ── Storage (this browser only) ─────────────────
-  const STORE = 'spending:v1', PREFS = 'spending:prefs';
+  // ── Storage: encrypted, and in this browser only ──
+  // Everything you enter is saved in localStorage as one AES-GCM ciphertext (the "vault"). Its key is
+  // derived from your passcode with PBKDF2 and lives only in memory while the tracker is unlocked; the
+  // passcode itself is never stored. Filter choices (spending:prefs) aren't sensitive and stay readable.
+  // spending:v1 is the unencrypted format of the first version, encrypted and removed on first unlock.
+  const VAULT = 'spending:vault', LEGACY = 'spending:v1', PREFS = 'spending:prefs';
+  const KDF_ITERATIONS = 600000, MIN_PASSCODE = 6;
+  let KEY = null, SALT = null;
+  const utf8 = new TextEncoder(), fromUtf8 = new TextDecoder();
+  function toB64(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function fromB64(str) {
+    const s = atob(str), out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+  async function deriveKey(passcode, salt, iterations) {
+    const base = await crypto.subtle.importKey('raw', utf8.encode(passcode.normalize('NFKC')), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, base,
+      { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  async function seal(json, key, salt) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, utf8.encode(json)));
+    return JSON.stringify({ v: 1, kdf: 'PBKDF2-SHA256', iterations: KDF_ITERATIONS, salt: toB64(salt), iv: toB64(iv), data: toB64(data) });
+  }
+  // Throws on a wrong passcode (AES-GCM authenticates the ciphertext) or a damaged vault.
+  async function unseal(passcode) {
+    const vault = JSON.parse(localStorage.getItem(VAULT));
+    if (!Number.isInteger(vault.iterations) || vault.iterations < 100000 || vault.iterations > 10000000) throw new Error('vault');
+    const salt = fromB64(vault.salt);
+    const key = await deriveKey(passcode, salt, vault.iterations);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(vault.iv) }, key, fromB64(vault.data));
+    return { key, salt, state: JSON.parse(fromUtf8.decode(plain)) };
+  }
   function readStore(key) {
     let raw = null;
     try { raw = localStorage.getItem(key); } catch { storageOk = false; }
     try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+  }
+  function hasVault() {
+    try { return localStorage.getItem(VAULT) != null; } catch { storageOk = false; return false; }
   }
   function cleanTx(t) {
     if (!t || typeof t.d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t.d)) return null;
@@ -1141,31 +1269,48 @@
     return { id: String(t.id || uid()), d: t.d, dn: dnOf(t.d), desc: String(t.desc ?? '').slice(0, 200),
       amt: Math.round(amt * 100) / 100, cat: typeof t.cat === 'string' && CAT[t.cat] ? t.cat : 'other' };
   }
-  function load() {
-    const d = readStore(STORE);
-    if (d && typeof d === 'object') {
-      if (CURRENCIES.includes(d.currency)) S.currency = d.currency;
-      if (d.rules && typeof d.rules === 'object') {
-        for (const [k, c] of Object.entries(d.rules)) if (typeof c === 'string' && CAT[c]) S.rules[k] = c;
-      }
-      if (d.mine === true && Array.isArray(d.txs)) { S.mine = true; S.txs = d.txs.map(cleanTx).filter(Boolean); }
+  // Load a decrypted (or legacy) state into S. Without saved expenses, show the sample data.
+  function applyState(d) {
+    d = d && typeof d === 'object' ? d : {};
+    S.currency = CURRENCIES.includes(d.currency) ? d.currency : 'PHP';
+    S.rules = Object.create(null);
+    if (d.rules && typeof d.rules === 'object') {
+      for (const [k, c] of Object.entries(d.rules)) if (typeof c === 'string' && CAT[c]) S.rules[k] = c;
     }
+    S.mine = d.mine === true && Array.isArray(d.txs);
+    S.txs = S.mine ? d.txs.map(cleanTx).filter(Boolean) : makeSample(todayDn());
+    setCurrency(S.currency);
+  }
+  function loadPrefs() {
     const p = readStore(PREFS);
     if (p && typeof p === 'object') {
       if (PRESETS.some(x => x.id === p.preset)) S.preset = p.preset;
       if (p.preset === 'custom' && Number.isInteger(p.from) && Number.isInteger(p.to)) { S.preset = 'custom'; S.from = p.from; S.to = p.to; }
       if (Array.isArray(p.only)) S.only = new Set(p.only.filter(id => typeof id === 'string' && CAT[id]));
     }
-    if (!S.mine) S.txs = makeSample(todayDn());
   }
+  // Saves queue up: each write encrypts the latest state, and writes never overlap.
+  let pending = null, flushing = null;
   function save() {
-    try {
-      localStorage.setItem(STORE, JSON.stringify({
-        v: 1, mine: S.mine, currency: S.currency, rules: S.rules,
-        txs: S.mine ? S.txs.map(({ id, d, desc, amt, cat }) => ({ id, d, desc, amt, cat })) : [],
-      }));
-      storageOk = true;
-    } catch { storageOk = false; }
+    if (!KEY) return Promise.resolve();
+    pending = {
+      key: KEY, salt: SALT,
+      json: JSON.stringify({ v: 1, mine: S.mine, currency: S.currency, rules: S.rules,
+        txs: S.mine ? S.txs.map(({ id, d, desc, amt, cat }) => ({ id, d, desc, amt, cat })) : [] }),
+    };
+    if (!flushing) flushing = flush();
+    return flushing;
+  }
+  async function flush() {
+    const was = storageOk;
+    while (pending) {
+      const { json, key, salt } = pending;
+      pending = null;
+      try { localStorage.setItem(VAULT, await seal(json, key, salt)); storageOk = true; }
+      catch { storageOk = false; }
+    }
+    flushing = null;
+    if (storageOk !== was && KEY) renderData();
   }
   function savePrefs() {
     try { localStorage.setItem(PREFS, JSON.stringify({ preset: S.preset, from: S.from, to: S.to, only: [...S.only] })); } catch { /* per-browser convenience only */ }
@@ -1844,10 +1989,10 @@
     const n = S.txs.length;
     const never = 'This page can’t make network requests, so what you enter never leaves your device.';
     $('data-status').textContent = S.mine
-      ? (n ? plural(n, 'expense') + ' saved in this browser, and only here. ' : 'Nothing saved yet. ') + never
+      ? (n ? plural(n, 'expense') + ', encrypted with your passcode and saved only in this browser. ' : 'Nothing saved yet. ') + never
         + ' Export a CSV to keep a backup or to move to another browser.'
         + (storageOk ? '' : ' Your browser is blocking storage, so changes will be lost when you close this page.')
-      : 'You’re looking at sample data, and nothing is saved until you add your own. ' + never;
+      : 'You’re looking at sample data, and nothing is saved until you add your own. From then on it’s encrypted with your passcode and kept only in this browser. ' + never;
     $('btn-export').hidden = !S.mine || !n;
     $('btn-clear').hidden = !S.mine;
     $('currency').value = S.currency;
@@ -2204,9 +2349,167 @@
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 
+  // ── Lock screen ─────────────────────────────────
+  // intro: nothing set up in this browser · create: choose a passcode · migrate: encrypt older
+  // unprotected data · locked: enter the passcode. Locking reloads the page, so nothing decrypted
+  // survives in memory or in the page.
+  const IDLE_MS = 15 * 60 * 1000;
+  let lockMode = 'intro', lastActive = Date.now(), eraseArmed = 0;
+  const legacyState = () => { const d = readStore(LEGACY); return d && typeof d === 'object' ? d : null; };
+  function passcodeProblem(p, again) {
+    if (p.length < MIN_PASSCODE) return 'Use at least ' + MIN_PASSCODE + ' characters.';
+    if (p !== again) return 'The two passcodes don’t match.';
+    return '';
+  }
+  function showLock(mode, note) {
+    lockMode = mode;
+    const legacy = mode === 'migrate' ? legacyState() : null;
+    const n = legacy && legacy.mine === true && Array.isArray(legacy.txs) ? legacy.txs.length : 0;
+    const [title, text] = {
+      intro: ['Private.', 'This spending tracker only opens on its owner’s devices, with a passcode. Expenses are encrypted and never leave the browser they were entered in.'],
+      create: ['Create a passcode.', 'You’ll enter it whenever you open the tracker in this browser. It encrypts your expenses and can’t be recovered, so choose one you’ll remember, and keep a CSV export as a backup.'],
+      migrate: ['Protect your expenses.', (n ? 'You have ' + plural(n, 'expense') + ' saved in this browser without a passcode. ' : 'The tracker in this browser isn’t protected yet. ')
+        + 'Create a passcode to encrypt everything. You’ll enter it whenever you open the tracker.'],
+      locked: ['Locked.', 'Enter your passcode to see your spending.'],
+    }[mode];
+    $('lock-title').textContent = title;
+    $('lock-text').textContent = text;
+    $('lock-note').textContent = note || '';
+    $('lock-form').hidden = mode === 'intro';
+    $('lock-setup').hidden = mode !== 'intro';
+    $('lock-forgot').hidden = mode !== 'locked';
+    $('lock-erase').hidden = true;
+    $('lock-confirm-field').hidden = mode === 'locked';
+    $('lock-pass').autocomplete = mode === 'locked' ? 'current-password' : 'new-password';
+    $('lock-pass-label').textContent = mode === 'locked' ? 'Passcode' : 'New passcode';
+    $('lock-go').textContent = { create: 'Create passcode', migrate: 'Encrypt and continue', locked: 'Unlock' }[mode] || 'Unlock';
+    $('lock-status').textContent = '';
+    $('lock-pass').value = $('lock-confirm').value = '';
+    $('lock').hidden = false;
+    $('app').hidden = true;
+    $('nav-actions').hidden = true;
+    if (mode !== 'intro') $('lock-pass').focus();
+  }
+  async function submitLock(e) {
+    e.preventDefault();
+    const pass = $('lock-pass').value, go = $('lock-go'), status = $('lock-status'), label = go.textContent;
+    status.textContent = '';
+    if (lockMode === 'locked' && !pass) { status.textContent = 'Enter your passcode.'; return; }
+    if (lockMode !== 'locked') {
+      const problem = passcodeProblem(pass, $('lock-confirm').value);
+      if (problem) { status.textContent = problem; return; }
+    }
+    go.disabled = true;
+    go.textContent = lockMode === 'locked' ? 'Unlocking…' : 'Encrypting…';
+    try {
+      if (lockMode === 'locked') {
+        let opened;
+        try { opened = await unseal(pass); }
+        catch { status.textContent = 'That passcode didn’t work.'; $('lock-pass').select(); return; }
+        KEY = opened.key; SALT = opened.salt;
+        applyState(opened.state);
+      } else {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        KEY = await deriveKey(pass, salt, KDF_ITERATIONS);
+        SALT = salt;
+        applyState(lockMode === 'migrate' ? legacyState() : null);
+        await save();
+        if (!storageOk) {
+          KEY = SALT = null;
+          status.textContent = 'This browser isn’t letting the page save anything, so the tracker can’t be set up here.';
+          return;
+        }
+        if (lockMode === 'migrate') { try { localStorage.removeItem(LEGACY); } catch { /* the vault is written; this copy goes next time */ } }
+      }
+      openApp();
+    } finally {
+      go.disabled = false;
+      go.textContent = label;
+    }
+  }
+  function openApp() {
+    $('lock').hidden = true;
+    $('app').hidden = false;
+    $('nav-actions').hidden = false;
+    lastActive = Date.now();
+    document.body.classList.add('anim');
+    refresh();
+    setTimeout(() => document.body.classList.remove('anim'), 1600);
+    window.scrollTo(0, 0);
+    $('app-title').focus({ preventScroll: true });
+  }
+  async function lockNow(reason) {
+    if (flushing) await flushing;
+    try { sessionStorage.setItem('spending:locked', reason); } catch { /* the note is optional */ }
+    location.reload();
+  }
+  function eraseDevice() {
+    const b = $('lock-erase-go');
+    if (Date.now() - eraseArmed > 4000) {
+      eraseArmed = Date.now();
+      b.textContent = 'Click again to erase';
+      setTimeout(() => { if (Date.now() - eraseArmed >= 4000) b.textContent = 'Erase and start over'; }, 4100);
+      return;
+    }
+    eraseArmed = 0;
+    b.textContent = 'Erase and start over';
+    try { localStorage.removeItem(VAULT); localStorage.removeItem(LEGACY); } catch { storageOk = false; }
+    showLock('create', 'The tracker in this browser was erased.');
+  }
+  function idleCheck() {
+    if (KEY && Date.now() - lastActive > IDLE_MS) lockNow('idle');
+  }
+  function boot() {
+    let note = '';
+    try {
+      if (sessionStorage.getItem('spending:locked') === 'idle') note = 'Locked after 15 minutes without activity.';
+      sessionStorage.removeItem('spending:locked');
+    } catch { /* no note */ }
+    if (!(window.crypto && crypto.subtle)) {
+      showLock('intro');
+      $('lock-text').textContent = 'This browser can’t encrypt data on this page. Open it over https:// in an up-to-date browser.';
+      $('lock-setup').hidden = true;
+      return;
+    }
+    if (hasVault()) showLock('locked', note);
+    else if (legacyState()) showLock('migrate');
+    else showLock('intro');
+  }
+
+  // ── Change passcode ─────────────────────────────
+  function openPass() {
+    $('pass-form').reset();
+    $('pass-status').textContent = '';
+    $('pass-dialog').showModal();
+    $('pass-old').focus();
+  }
+  async function submitPass(e) {
+    e.preventDefault();
+    const next = $('pass-new').value, status = $('pass-status'), go = $('pass-go');
+    const problem = passcodeProblem(next, $('pass-confirm').value);
+    if (problem) { status.textContent = problem; return; }
+    go.disabled = true;
+    go.textContent = 'Changing…';
+    try {
+      if (flushing) await flushing;
+      try { await unseal($('pass-old').value); }
+      catch { status.textContent = 'Your current passcode didn’t match.'; $('pass-old').select(); return; }
+      const prevKey = KEY, prevSalt = SALT, salt = crypto.getRandomValues(new Uint8Array(16));
+      KEY = await deriveKey(next, salt, KDF_ITERATIONS);
+      SALT = salt;
+      await save();
+      if (!storageOk) { KEY = prevKey; SALT = prevSalt; }
+      $('pass-dialog').close();
+      toast(storageOk ? 'Passcode changed. Use the new one from now on.' : 'Couldn’t save in this browser, so your old passcode still applies.');
+    } finally {
+      go.disabled = false;
+      go.textContent = 'Change passcode';
+    }
+  }
+
   // ── Wiring ──────────────────────────────────────
   function init() {
-    load();
+    loadPrefs();
     setCurrency(S.currency);
 
     const presets = $('presets');
@@ -2345,10 +2648,21 @@
       save(); refresh();
       toast('Deleted all your expenses. Showing sample data again.', true);
     });
+    $('btn-pass').addEventListener('click', openPass);
+    $('pass-form').addEventListener('submit', submitPass);
 
-    document.body.classList.add('anim');
-    refresh();
-    setTimeout(() => document.body.classList.remove('anim'), 1600);
+    // lock screen
+    $('lock-form').addEventListener('submit', submitLock);
+    $('lock-setup').addEventListener('click', () => showLock('create'));
+    $('lock-forgot').addEventListener('click', () => { $('lock-erase').hidden = !$('lock-erase').hidden; });
+    $('lock-erase-go').addEventListener('click', eraseDevice);
+    $('btn-lock').addEventListener('click', () => lockNow('manual'));
+    // lock after 15 idle minutes, and whenever Back/Forward restores the unlocked page from memory
+    for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) document.addEventListener(ev, () => { lastActive = Date.now(); }, { capture: true, passive: true });
+    window.addEventListener('scroll', () => { lastActive = Date.now(); }, { passive: true });
+    setInterval(idleCheck, 15000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') idleCheck(); });
+    window.addEventListener('pageshow', e => { if (e.persisted && KEY) location.reload(); });
 
     // redraw the charts when the layout width changes
     const main = $('main');
@@ -2357,8 +2671,10 @@
       if (main.clientWidth === lastW) return;
       lastW = main.clientWidth;
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => { if (V && !$('dash').hidden) { renderMonthly(V); renderWeek(V); renderWeeks(V); } });
+      frame = requestAnimationFrame(() => { if (V && KEY && !$('dash').hidden) { renderMonthly(V); renderWeek(V); renderWeeks(V); } });
     }).observe(main);
+
+    boot();
   }
 
   init();

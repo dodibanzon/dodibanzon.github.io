@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- Content Security Policy: script-src pins the inline script by its SHA-256 hash.
        After any edit to the script, update the hash or the page renders blank (see CLAUDE.md). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-8Kt8IC58Y0SQabU0Uus0LoGD5rJpfmjviQZcxhePKeA='; style-src 'unsafe-inline'; img-src data:; connect-src https://api.web3forms.com; base-uri 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6SE7yA7F/cdAM0GGSaH4Qfb1y4MH9YMmYUQ5j5J5dEI='; style-src 'unsafe-inline'; img-src data:; connect-src https://api.web3forms.com; base-uri 'none'; form-action 'none'" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta name="theme-color" content="#000000" />
   <title>Dodi Banzon</title>
@@ -727,12 +727,14 @@
       }
       .nav-links.open { display: flex; }
       .nav-links a {
+        display: block;
         padding: .9rem .5rem;
         border-radius: 0;
         font-size: 1.0625rem;
         border-bottom: 1px solid rgba(255,255,255,.07);
       }
-      .nav-links li:last-child a { border-bottom: none; }
+      .nav-links li:last-child a,
+      .nav-links li:has(+ li[hidden]:last-child) a { border-bottom: none; }
       .nav-links a.active { background: none; }
     }
     @media (max-width: 520px) {
@@ -765,6 +767,7 @@
       <li><a href="#" data-page="dashboard">Dashboard</a></li>
       <li><a href="#" data-page="about">About</a></li>
       <li><a href="#" data-page="contact">Contact</a></li>
+      <li id="nav-spending" hidden><a href="spending/">Spending</a></li>
     </ul>
   </div>
 </nav>
@@ -1228,6 +1231,14 @@
 
     // nav data-page links
     bindLinks();
+
+    // The private spending tracker is linked only in browsers where it has been set up,
+    // so visitors never see it. (Its data is encrypted there; this only checks it exists.)
+    try {
+      if (localStorage.getItem('spending:vault') || localStorage.getItem('spending:v1')) {
+        document.getElementById('nav-spending').hidden = false;
+      }
+    } catch { /* storage blocked: keep the link hidden */ }
 
     // contact form — delegated, because #page outlives each page swap and the CSP blocks inline onsubmit
     document.getElementById('page').addEventListener('submit', e => {
